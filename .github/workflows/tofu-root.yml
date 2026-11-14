@@ -78,6 +78,9 @@ jobs:
           tofu init -no-color
           tofu validate -no-color
 
+      # The hash covers what the plan changes: resources and outputs whose
+      # action is not "no-op". Unchanged outputs added by another merge must
+      # not make an otherwise identical plan differ.
       - name: Plan
         working-directory: ${{ env.WORKDIR }}
         env:
@@ -94,7 +97,8 @@ jobs:
                 | select(.change.actions != ["no-op"])
                 | {address, actions: .change.actions, after: .change.after,
                    after_unknown: .change.after_unknown}],
-              outputs: (.output_changes // {})}' \
+              outputs: (.output_changes // {}
+                | with_entries(select(.value.actions != ["no-op"])))}' \
             | openssl dgst -sha256 -hmac "$PLAN_HASH_KEY" | awk '{print $NF}' > plan.sha
 
       - name: Post the plan
@@ -185,7 +189,8 @@ jobs:
                 | select(.change.actions != ["no-op"])
                 | {address, actions: .change.actions, after: .change.after,
                    after_unknown: .change.after_unknown}],
-              outputs: (.output_changes // {})}' \
+              outputs: (.output_changes // {}
+                | with_entries(select(.value.actions != ["no-op"])))}' \
             | openssl dgst -sha256 -hmac "$PLAN_HASH_KEY" | awk '{print $NF}' > plan.sha
 
       - name: Compare with the approved plan
