@@ -203,3 +203,16 @@ jobs:
       - name: Apply
         working-directory: ${{ env.WORKDIR }}
         run: tofu apply -no-color -lock-timeout=5m tfplan
+
+      # Rebuilds /platform/inventory/ in Taelron Docs from the applied state
+      # (tools/inventory). Runs only after a successful apply; a failure here
+      # is reported but does not mark the apply as failed.
+      - name: Inventory for Taelron Docs
+        if: success()
+        continue-on-error: true
+        working-directory: ${{ env.WORKDIR }}
+        env:
+          ROOT: ${{ inputs.root }}
+        run: |
+          ../../tools/inventory/publish.sh "$ROOT"
+          echo "Inventory of \`$WORKDIR\` published to /platform/inventory/" >> "$GITHUB_STEP_SUMMARY"

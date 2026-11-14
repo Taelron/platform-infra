@@ -51,4 +51,9 @@ export AWS_PROFILE=platform
 tofu init
 tofu plan -out=bootstrap.tfplan
 tofu apply bootstrap.tfplan
+../../tools/inventory/publish.sh bootstrap
 ```
+
+The last command updates the inventory page of Taelron Docs
+(`/platform/inventory/`): the pipeline rebuilds it after every apply of
+`tofu/platform` and `tofu/docs`, but never applies this root.
