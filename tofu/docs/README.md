@@ -12,6 +12,7 @@ the bucket outside Git.
 | `cognito.tf`     | User pool, MFA, three groups, one app client   |
 | `edge.tf`        | Lambda@Edge functions, us-east-1               |
 | `cloudfront.tf`  | Distribution and origin access control         |
+| `publish.tf`     | Role `docs-publish` for the publish workflow   |
 | `outputs.tf`     | Bucket, distribution, the two DNS records      |
 
 The bucket has `prevent_destroy`: it holds the only copy of the pages.
