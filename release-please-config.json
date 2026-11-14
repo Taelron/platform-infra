@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": true,
+  "include-v-in-tag": true,
+  "tag-separator": "-",
+  "separate-pull-requests": true,
+  "pull-request-title-pattern": "chore(${component}): release ${version}",
+  "packages": {
+    ".": {
+      "component": "toolchain",
+      "release-as": "1.0.0",
+      "exclude-paths": ["tofu/platform", "tofu/docs", "ansible", "tools"]
+    },
+    "tofu/platform": {
+      "component": "foundation",
+      "release-as": "1.0.0"
+    }
+  }
+}

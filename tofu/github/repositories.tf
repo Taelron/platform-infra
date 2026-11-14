@@ -18,11 +18,15 @@ resource "github_repository" "platform" {
   has_wiki        = false
   has_discussions = false
 
-  allow_merge_commit     = true
-  allow_squash_merge     = true
-  allow_rebase_merge     = true
-  allow_auto_merge       = false
-  delete_branch_on_merge = false
+  # Squash merge only (Versioning and Releases): the pull request title, in
+  # Conventional Commits, becomes the one commit release-please reads.
+  allow_merge_commit          = false
+  allow_squash_merge          = true
+  allow_rebase_merge          = false
+  squash_merge_commit_title   = "PR_TITLE"
+  squash_merge_commit_message = "BLANK"
+  allow_auto_merge            = false
+  delete_branch_on_merge      = false
 
   archive_on_destroy = true
 

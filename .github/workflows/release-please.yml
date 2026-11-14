@@ -1,0 +1,30 @@
+# Keeps one release pull request per platform layer (Versioning and
+# Releases): toolchain (the repository root, without the folders below),
+# foundation (tofu/platform), core (ansible/, added with Phase 4). tofu/docs
+# and tools/ are Taelron Docs, never released. Gaetan merges a release pull
+# request to tag the layer (toolchain-v1.0.0, foundation-v1.0.0) and publish
+# its GitHub Release.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
