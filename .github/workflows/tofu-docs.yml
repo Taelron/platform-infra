@@ -1,0 +1,188 @@
+# OpenTofu for tofu/docs (Taelron Docs): plan on each pull request, apply on
+# merge to main after approval in the environment "aws-apply". Same roles, same
+# approval and same plan-hash binding as tofu-platform.yml.
+name: tofu-docs
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tofu/docs/**"
+      - ".github/workflows/tofu-docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tofu/docs/**"
+      - ".github/workflows/tofu-docs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tofu-docs
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  TOFU_VERSION: 1.13.9
+  TF_IN_AUTOMATION: "1"
+  TF_INPUT: "0"
+  WORKDIR: tofu/docs
+  NODE_VERSION: "24"
+  PLAN_MARKER: "<!-- tofu-docs-plan -->"
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: Format
+        run: tofu fmt -check -recursive tofu
+
+      # The Lambda@Edge bundles are committed: rebuild them from the source
+      # and fail if they differ, so the plan deploys what the diff shows.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Edge functions match their source
+        working-directory: ${{ env.WORKDIR }}/edge
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+          git diff --exit-code -- dist
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::181841605684:role/platform-github-plan
+          role-session-name: tofu-docs-plan-pr-${{ github.event.pull_request.number }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Init and validate
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          tofu init -no-color
+          tofu validate -no-color
+
+      - name: Plan
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          tofu plan -no-color -lock-timeout=5m -out=tfplan
+          tofu show -no-color tfplan > plan.txt
+          tofu show -json tfplan | jq -S '{
+              resources: [.resource_changes // [] | .[]
+                | select(.change.actions != ["no-op"])
+                | {address, actions: .change.actions, after: .change.after,
+                   after_unknown: .change.after_unknown}],
+              outputs: (.output_changes // {})}' | sha256sum | cut -d' ' -f1 > plan.sha
+
+      - name: Post the plan
+        working-directory: ${{ env.WORKDIR }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          {
+            # Line 2 is the only line the apply job reads: fixed position,
+            # bound to the pull request's head commit.
+            echo "$PLAN_MARKER"
+            echo "plan-hash: \`$(cat plan.sha)\` commit: \`$HEAD_SHA\`"
+            echo
+            echo "### tofu plan, \`tofu/docs\`, commit ${HEAD_SHA:0:7}"
+            echo
+            echo '<details><summary>Plan</summary>'
+            echo
+            echo '```'
+            head -c 60000 plan.txt
+            echo '```'
+            echo '</details>'
+          } > comment.md
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file comment.md
+          cat comment.md >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: aws-apply
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: ${{ env.TOFU_VERSION }}
+          tofu_wrapper: false
+
+      - name: Hash approved on the merged pull request
+        id: approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The pull request merged as this very commit, and its last plan
+          # was posted by this workflow for its final head commit.
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merge_commit_sha == env.GITHUB_SHA and .merged_at != null)][0].number // empty')
+          test -n "$pr" || { echo "::error::no pull request merged as $GITHUB_SHA"; exit 1; }
+          head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq '.head.sha')
+          hash=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$pr/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .body | split("\n")
+                      | select(.[0] == env.PLAN_MARKER) | .[1]' \
+            | grep -xE "plan-hash: \`[0-9a-f]{64}\` commit: \`$head\`" \
+            | tail -n1 | grep -oE '[0-9a-f]{64}' | head -n1)
+          test -n "$hash" || { echo "::error::no plan posted for $head on pull request $pr"; exit 1; }
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: arn:aws:iam::181841605684:role/platform-github-apply
+          role-session-name: tofu-docs-apply-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Plan
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          tofu init -no-color
+          tofu plan -no-color -lock-timeout=5m -out=tfplan
+          tofu show -json tfplan | jq -S '{
+              resources: [.resource_changes // [] | .[]
+                | select(.change.actions != ["no-op"])
+                | {address, actions: .change.actions, after: .change.after,
+                   after_unknown: .change.after_unknown}],
+              outputs: (.output_changes // {})}' | sha256sum | cut -d' ' -f1 > plan.sha
+
+      - name: Compare with the approved plan
+        working-directory: ${{ env.WORKDIR }}
+        env:
+          APPROVED: ${{ steps.approved.outputs.hash }}
+          PR: ${{ steps.approved.outputs.pr }}
+        run: |
+          if [ "$(cat plan.sha)" != "$APPROVED" ]; then
+            echo "::error::plan differs from the one on pull request $PR; open a new pull request"
+            exit 1
+          fi
+          echo "Plan matches pull request $PR: $APPROVED" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        working-directory: ${{ env.WORKDIR }}
+        run: tofu apply -no-color -lock-timeout=5m tfplan

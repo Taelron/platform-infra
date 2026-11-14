@@ -1,0 +1,25 @@
+{
+  "name": "docs-edge",
+  "private": true,
+  "description": "Lambda@Edge functions of Taelron Docs, from aws-samples/cloudfront-authorization-at-edge",
+  "license": "MIT-0",
+  "scripts": {
+    "build": "webpack",
+    "test": "node --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "aws-jwt-verify": "5.2.1",
+    "cookie": "0.7.2"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.164",
+    "@types/cookie": "0.6.0",
+    "@types/node": "22.20.5",
+    "html-loader": "5.1.0",
+    "terser-webpack-plugin": "5.6.1",
+    "ts-loader": "9.6.2",
+    "typescript": "5.9.3",
+    "webpack": "5.112.2",
+    "webpack-cli": "7.3.1"
+  }
+}

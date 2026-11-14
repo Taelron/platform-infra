@@ -36,16 +36,20 @@ resource "aws_iam_role" "plan" {
   max_session_duration = 3600
 }
 
-# What `tofu plan` of tofu/platform reads, and nothing else. Any pull request
+# What `tofu plan` of tofu/platform and tofu/docs reads, and nothing else. Any pull request
 # can run code with this role, so it gets an allowlist instead of
 # ReadOnlyAccess, which also reads data (logs, items, code, trust policies).
-# The services are those of the Platform Runbook, Phase 3; a pull request that
-# brings a new service adds its read actions here, applied from the RHEL box.
+# The services are those of the Platform Runbook, Phase 3, and of Taelron Docs
+# (TAE-146); a pull request that brings a new service adds its read actions
+# here, applied from the RHEL box.
 data "aws_iam_policy_document" "plan_read" {
   statement {
-    sid       = "PlatformState"
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.state.arn}/platform/*"]
+    sid     = "PipelineState"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${aws_s3_bucket.state.arn}/platform/*",
+      "${aws_s3_bucket.state.arn}/docs/*",
+    ]
   }
 
   statement {
@@ -84,6 +88,35 @@ data "aws_iam_policy_document" "plan_read" {
     resources = ["*"]
   }
 
+  # Taelron Docs: the distribution, its origin access control and the managed
+  # cache policies it uses.
+  statement {
+    sid = "CloudFront"
+    actions = [
+      "cloudfront:GetDistribution",
+      "cloudfront:GetDistributionConfig",
+      "cloudfront:GetOriginAccessControl",
+      "cloudfront:GetCachePolicy",
+      "cloudfront:ListCachePolicies",
+      "cloudfront:ListTagsForResource",
+    ]
+    resources = ["*"]
+  }
+
+  # Taelron Docs: the Lambda@Edge functions. GetFunction also returns a link
+  # to the code, which holds the nonce signing secret of the sign-in redirect;
+  # accepted, as for the Cognito app client below.
+  statement {
+    sid = "DocsLambda"
+    actions = [
+      "lambda:GetFunction",
+      "lambda:GetFunctionCodeSigningConfig",
+      "lambda:ListVersionsByFunction",
+      "lambda:ListTags",
+    ]
+    resources = ["arn:aws:lambda:us-east-1:${local.account_id}:function:docs-*"]
+  }
+
   # Cognito: reading an app client returns its secret, which the platform
   # state holds anyway. Accepted: both are readable by the plan of main.
   statement {
@@ -103,7 +136,8 @@ data "aws_iam_policy_document" "plan_read" {
     resources = ["*"]
   }
 
-  # IAM, only for the platform's own names: never the bootstrap's Red Hat role.
+  # IAM, only for the platform's and Taelron Docs' own names: never the
+  # bootstrap's Red Hat role.
   statement {
     sid = "PlatformIam"
     actions = [
@@ -122,14 +156,16 @@ data "aws_iam_policy_document" "plan_read" {
     ]
     resources = [
       "arn:aws:iam::${local.account_id}:role/platform-*",
+      "arn:aws:iam::${local.account_id}:role/docs-*",
       "arn:aws:iam::${local.account_id}:instance-profile/platform-*",
       "arn:aws:iam::${local.account_id}:policy/platform-*",
       "arn:aws:iam::aws:policy/*",
     ]
   }
 
-  # Bucket settings, not contents, of the platform's own buckets. ListBucket
-  # is what HeadBucket needs to read a bucket; it lists keys, never contents.
+  # Bucket settings, not contents, of the platform's and Taelron Docs' buckets.
+  # ListBucket is what HeadBucket needs to read a bucket; it lists keys, never
+  # contents.
   statement {
     sid = "PlatformBucketSettings"
     actions = [
@@ -140,7 +176,10 @@ data "aws_iam_policy_document" "plan_read" {
       "s3:GetLifecycleConfiguration",
       "s3:GetReplicationConfiguration",
     ]
-    resources = ["arn:aws:s3:::platform-*"]
+    resources = [
+      "arn:aws:s3:::platform-*",
+      "arn:aws:s3:::docs-*",
+    ]
   }
 }
 
@@ -153,9 +192,12 @@ resource "aws_iam_role_policy" "plan_read" {
 # A plan takes the state lock: it writes and deletes the .tflock object only.
 data "aws_iam_policy_document" "plan_state_lock" {
   statement {
-    sid       = "StateLockObjects"
-    actions   = ["s3:PutObject", "s3:DeleteObject"]
-    resources = ["${aws_s3_bucket.state.arn}/platform/*.tflock"]
+    sid     = "StateLockObjects"
+    actions = ["s3:PutObject", "s3:DeleteObject"]
+    resources = [
+      "${aws_s3_bucket.state.arn}/platform/*.tflock",
+      "${aws_s3_bucket.state.arn}/docs/*.tflock",
+    ]
   }
 }
 
@@ -166,14 +208,17 @@ resource "aws_iam_role_policy" "plan_state_lock" {
 }
 
 # Kept behind the allowlist, so that a read added to it later cannot reach
-# object or secret contents outside the platform state. The bootstrap state
+# object or secret contents outside the pipeline's states. The bootstrap state
 # and the Red Hat role hold the external ID; the backup buckets hold data.
 data "aws_iam_policy_document" "plan_guard" {
   statement {
-    sid           = "DenyObjectReadsOutsidePlatformState"
-    effect        = "Deny"
-    actions       = ["s3:GetObject", "s3:GetObjectVersion"]
-    not_resources = ["${aws_s3_bucket.state.arn}/platform/*"]
+    sid     = "DenyObjectReadsOutsidePipelineState"
+    effect  = "Deny"
+    actions = ["s3:GetObject", "s3:GetObjectVersion"]
+    not_resources = [
+      "${aws_s3_bucket.state.arn}/platform/*",
+      "${aws_s3_bucket.state.arn}/docs/*",
+    ]
   }
 
   statement {
