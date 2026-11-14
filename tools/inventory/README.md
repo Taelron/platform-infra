@@ -21,6 +21,13 @@ resources and security group rules are counted per root, not listed. Nothing els
 OpenTofu marks sensitive. Add a field to the allowlist in `filter.jq` only if
 it is never secret.
 
+## Release per root
+
+The roots table names each root's layer and its last released tag at the
+apply (`git describe --tags --match '<layer>-v*'`): `tofu/platform` is
+`foundation`, `tofu/bootstrap` is `toolchain`, `tofu/docs` is in no layer.
+Until a layer has a tag, it reads "not released".
+
 ## When it runs
 
 - `tofu/platform` and `tofu/docs`: after every apply, in the `apply` job of

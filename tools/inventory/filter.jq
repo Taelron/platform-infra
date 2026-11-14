@@ -7,7 +7,8 @@
 # Nothing else leaves: no policy document, no user data, no output, and no
 # value OpenTofu marks sensitive.
 #
-# Arguments: --arg root, --arg generated_at, --arg commit.
+# Arguments: --arg root, --arg generated_at, --arg commit, --arg layer and
+# --arg release (both empty when the root is in no layer or not released).
 
 def managed_aws:
   [.values.root_module.resources[]?, (.values.root_module.child_modules[]?.resources[]?)]
@@ -38,6 +39,8 @@ managed_aws as $all
     root: $root,
     generated_at: $generated_at,
     commit: $commit,
+    layer: (if $layer == "" then null else $layer end),
+    release: (if $release == "" then null else $release end),
     not_listed: (($all | length) - ($tagged | length)),
     resources: [
       $tagged[] as $r
