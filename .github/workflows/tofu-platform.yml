@@ -68,10 +68,12 @@ jobs:
         run: |
           tofu plan -no-color -lock-timeout=5m -out=tfplan
           tofu show -no-color tfplan > plan.txt
-          tofu show -json tfplan | jq -S '[.resource_changes // [] | .[]
-            | select(.change.actions != ["no-op"])
-            | {address, actions: .change.actions, after: .change.after,
-               after_unknown: .change.after_unknown}]' | sha256sum | cut -d' ' -f1 > plan.sha
+          tofu show -json tfplan | jq -S '{
+              resources: [.resource_changes // [] | .[]
+                | select(.change.actions != ["no-op"])
+                | {address, actions: .change.actions, after: .change.after,
+                   after_unknown: .change.after_unknown}],
+              outputs: (.output_changes // {})}' | sha256sum | cut -d' ' -f1 > plan.sha
 
       - name: Post the plan
         working-directory: ${{ env.WORKDIR }}
@@ -81,10 +83,12 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           {
+            # Line 2 is the only line the apply job reads: fixed position,
+            # bound to the pull request's head commit.
             echo "$PLAN_MARKER"
-            echo "### tofu plan, \`tofu/platform\`, commit ${HEAD_SHA:0:7}"
+            echo "plan-hash: \`$(cat plan.sha)\` commit: \`$HEAD_SHA\`"
             echo
-            echo "plan-hash: \`$(cat plan.sha)\`"
+            echo "### tofu plan, \`tofu/platform\`, commit ${HEAD_SHA:0:7}"
             echo
             echo '<details><summary>Plan</summary>'
             echo
@@ -119,13 +123,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].number')
-          test -n "$pr" || { echo "::error::no pull request for $GITHUB_SHA"; exit 1; }
+          # The pull request merged as this very commit, and its last plan
+          # was posted by this workflow for its final head commit.
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merge_commit_sha == env.GITHUB_SHA and .merged_at != null)][0].number // empty')
+          test -n "$pr" || { echo "::error::no pull request merged as $GITHUB_SHA"; exit 1; }
+          head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq '.head.sha')
           hash=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$pr/comments" \
-            --jq '.[] | select(.user.login == "github-actions[bot]")
-                      | select(.body | startswith(env.PLAN_MARKER)) | .body' \
-            | grep -oE 'plan-hash: `[0-9a-f]{64}`' | tail -n1 | grep -oE '[0-9a-f]{64}')
-          test -n "$hash" || { echo "::error::no plan posted on pull request $pr"; exit 1; }
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .body | split("\n")
+                      | select(.[0] == env.PLAN_MARKER) | .[1]' \
+            | grep -xE "plan-hash: \`[0-9a-f]{64}\` commit: \`$head\`" \
+            | tail -n1 | grep -oE '[0-9a-f]{64}' | head -n1)
+          test -n "$hash" || { echo "::error::no plan posted for $head on pull request $pr"; exit 1; }
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
           echo "hash=$hash" >> "$GITHUB_OUTPUT"
 
@@ -140,10 +149,12 @@ jobs:
         run: |
           tofu init -no-color
           tofu plan -no-color -lock-timeout=5m -out=tfplan
-          tofu show -json tfplan | jq -S '[.resource_changes // [] | .[]
-            | select(.change.actions != ["no-op"])
-            | {address, actions: .change.actions, after: .change.after,
-               after_unknown: .change.after_unknown}]' | sha256sum | cut -d' ' -f1 > plan.sha
+          tofu show -json tfplan | jq -S '{
+              resources: [.resource_changes // [] | .[]
+                | select(.change.actions != ["no-op"])
+                | {address, actions: .change.actions, after: .change.after,
+                   after_unknown: .change.after_unknown}],
+              outputs: (.output_changes // {})}' | sha256sum | cut -d' ' -f1 > plan.sha
 
       - name: Compare with the approved plan
         working-directory: ${{ env.WORKDIR }}

@@ -24,7 +24,7 @@ data "aws_iam_policy_document" "plan_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.repository}:pull_request"]
+      values   = ["${local.oidc_subject_prefix}:pull_request"]
     }
   }
 }
@@ -235,7 +235,7 @@ data "aws_iam_policy_document" "apply_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${local.repository}:environment:production"]
+      values   = ["${local.oidc_subject_prefix}:environment:production"]
     }
   }
 }
