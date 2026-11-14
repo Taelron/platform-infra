@@ -28,7 +28,9 @@ Every request goes through `check-auth` (viewer request):
 - a path ending in `/` serves its `index.html`.
 
 `http-headers` (origin response) adds the security headers and gives every
-page under `/denied/` the status 403. `/parseauth`, `/refreshauth` and
+page under `/denied/` the status 403. A page that does not exist serves
+`/not-found/index.html` with the status 404 (CloudFront custom error
+response; CloudFront may list the bucket, so S3 answers 404, not 403). `/parseauth`, `/refreshauth` and
 `/signout` are handled by their own function.
 
 A reader's groups are read from their ID token: a change of group takes effect
