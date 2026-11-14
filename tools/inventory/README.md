@@ -33,6 +33,10 @@ Until a layer has a tag, it reads "not released".
 - `tofu/platform` and `tofu/docs`: after every apply, in the `apply` job of
   `.github/workflows/tofu-root.yml`, with the apply role.
 - `tofu/bootstrap`: by hand from the RHEL box after its apply (its README).
+- A merge that only changes `tools/inventory/` plans both roots but applies
+  nothing (no changes, no approval), so it does not republish the page. Run
+  `publish.sh` by hand for each root afterwards (below); it reads the state
+  and writes only under `platform/inventory/`.
 
 `publish.sh` writes `platform/inventory/<root>.json`, reads every root's JSON
 back, rebuilds `index.html` with the Platform sidebar of a live page, and
