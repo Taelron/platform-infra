@@ -32,3 +32,8 @@ output "docs_cname" {
     value = aws_cloudfront_distribution.site.domain_name
   }
 }
+
+output "publish_role_arn" {
+  description = "The role the publish workflow of Taelron/taelron-docs-site assumes."
+  value       = aws_iam_role.publish.arn
+}
