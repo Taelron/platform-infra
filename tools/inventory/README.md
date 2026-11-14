@@ -13,9 +13,11 @@ tag).
 ## What the page may hold
 
 For each taggable AWS resource: address, type, name, `Project`, `Component`,
-region, and per type only: instance type and state, volume size and type,
-certificate status, bucket versioning. Untaggable resources are counted per
-root. Nothing else: no policy document, no user data, no output, no value
+region, and a one-line summary from these fields only: instance type and
+state at last apply, volume size and type, certificate status, bucket
+versioning, Lambda runtime, CloudFront status at last apply, load balancer
+type. A listener is named after its protocol ("HTTPS listener"). Untaggable
+resources and security group rules are counted per root, not listed. Nothing else: no policy document, no user data, no output, no value
 OpenTofu marks sensitive. Add a field to the allowlist in `filter.jq` only if
 it is never secret.
 
