@@ -9,12 +9,14 @@ on:
       - "tofu/docs/**"
       - ".github/workflows/tofu-docs.yml"
       - ".github/workflows/tofu-root.yml"
+      - "tools/inventory/**"
   push:
     branches: [main]
     paths:
       - "tofu/docs/**"
       - ".github/workflows/tofu-docs.yml"
       - ".github/workflows/tofu-root.yml"
+      - "tools/inventory/**"
 
 permissions:
   contents: read

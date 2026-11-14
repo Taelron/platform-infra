@@ -48,12 +48,12 @@ managed_aws as $all
           project: ($r.values.tags_all.Project // null),
           component: ($r.values.tags_all.Component // null),
           region: ($r.values.region // "global"),
-          # The state of an instance or a distribution is the one recorded at
-          # the last apply, not a live reading: the summary says so.
+          # Recorded at the last apply, not a live reading: the page's column
+          # is headed "At last apply" (the host stops every night).
           summary: (
             if $r.type == "aws_instance" then
               [safe($r; "instance_type"),
-               (safe($r; "instance_state") | if . then "\(.) at last apply" else null end)]
+               safe($r; "instance_state")]
             elif $r.type == "aws_ebs_volume" then
               [[(safe($r; "size") | if . then "\(.) GB" else null end), safe($r; "type")]
                | map(select(. != null)) | join(" ")]
@@ -64,7 +64,7 @@ managed_aws as $all
             elif $r.type == "aws_lambda_function" then
               [safe($r; "runtime")]
             elif $r.type == "aws_cloudfront_distribution" then
-              [safe($r; "status") | if . then "\(ascii_downcase) at last apply" else null end]
+              [safe($r; "status") | if . then ascii_downcase else null end]
             elif $r.type == "aws_lb" then
               [safe($r; "load_balancer_type") | if . then "\(.) load balancer" else null end]
             else [] end

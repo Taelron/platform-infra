@@ -16,6 +16,9 @@ if [ -z "$sidebar" ]; then
 fi
 if grep -q 'href="/platform/inventory/"' <<<"$sidebar"; then
   sidebar=$(sed 's|href="/platform/inventory/"|href="/platform/inventory/" aria-current="page"|' <<<"$sidebar")
+elif grep -q 'href="/platform/aws-inventory/"' <<<"$sidebar"; then
+  # Inventory comes just before "Not in OpenTofu", as in the Platform tree.
+  sidebar=$(sed 's|<li><a href="/platform/aws-inventory/"|<li><a href="/platform/inventory/" aria-current="page">Inventory</a></li><li><a href="/platform/aws-inventory/"|' <<<"$sidebar")
 else
   sidebar=$(sed 's|</ol>|<li><a href="/platform/inventory/" aria-current="page">Inventory</a></li></ol>|' <<<"$sidebar")
 fi
@@ -42,7 +45,7 @@ body=$(jq -r -s '
        | "<h2 id=\"\($p[0].project // "untagged" | esc)\">\($p[0].project // "untagged" | esc)</h2>",
          ($p | group_by(.component // "untagged")[]
           | "<h3>\(.[0].component // "untagged" | esc)</h3>",
-            "<div class=\"table-box\"><table><thead><tr><th>Name</th><th>Type</th><th>Region</th><th>State or size</th></tr></thead><tbody>",
+            "<div class=\"table-box\"><table><thead><tr><th>Name</th><th>Type</th><th>Region</th><th>At last apply</th></tr></thead><tbody>",
             (.[] | "<tr><td>\(.name | cell)</td><td><code>\(.type | esc)</code></td><td>\(.region | cell)</td><td>\(state_cell)</td></tr>"),
             "</tbody></table></div>"))
     ] | join("\n")
@@ -89,7 +92,7 @@ cat <<HTML
       <a href="/">Home</a><span aria-hidden="true">/</span><a href="/platform/">Platform</a><span aria-hidden="true">/</span><span>Inventory</span>
     </nav>
     <h1>Inventory</h1>
-    <p class="lead">What OpenTofu has provisioned in AWS, by project and component. Rebuilt after every apply. Resources AWS cannot tag, and security group rules, are only counted; a state shown is the one at the last apply.</p>
+    <p class="lead">What OpenTofu has provisioned in AWS, by project and component. Rebuilt after every apply. The last column is what OpenTofu recorded at that apply, not a live reading. Resources AWS cannot tag, and security group rules, are only counted.</p>
 
 $body
 
