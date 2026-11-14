@@ -37,12 +37,12 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const payload = await CONFIG.jwtVerifier.verify(cookies.idToken);
     CONFIG.logger.debug("JWT payload:", payload);
 
-    // Taelron Docs: the reader's Cognito groups decide which spaces open.
-    // A refused space serves the denied page; the origin-response function
-    // gives every page under /denied/ the status 403.
+    // Taelron Docs: only the group docs-reader opens the pages. A refused
+    // page serves the denied page; the origin-response function gives every
+    // page under /denied/ the status 403.
     const groups = payload["cognito:groups"] ?? [];
     if (!isAllowed(request.uri, groups)) {
-      CONFIG.logger.info("Space refused:", request.uri);
+      CONFIG.logger.info("Access refused:", request.uri);
       request.uri = DENIED_PAGE;
       request.querystring = "";
       return request;

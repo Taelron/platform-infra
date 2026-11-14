@@ -1,23 +1,17 @@
 // Taelron Docs: which paths a signed-in reader may open.
 //
-//   /, /index.html, /assets/*, /denied/*   any signed-in reader
-//   /handbook/*                            group docs-handbook
-//   /platform/*                            group docs-platform
-//   /fleetdesk/*                           group docs-fleetdesk
-//   anything else                          refused
+//   group docs-reader            every page
+//   signed in, without it        /assets/* and /denied/* only (the denied
+//                                page and what it needs to display)
 //
-// The path is decoded before it is matched, because S3 decodes it too: a
-// request for /%68andbook/ must not slip past the handbook rule.
+// The path is decoded before it is checked, because S3 decodes it too, and a
+// path with "." or ".." segments or a backslash is refused for everyone.
 
 export const DENIED_PAGE = "/denied/index.html";
 
-const OPEN_PREFIXES = ["assets", "denied"];
+export const READER_GROUP = "docs-reader";
 
-const SPACE_GROUPS: Readonly<Record<string, string>> = {
-  handbook: "docs-handbook",
-  platform: "docs-platform",
-  fleetdesk: "docs-fleetdesk",
-};
+const OPEN_PREFIXES = ["assets", "denied"];
 
 export function isAllowed(uri: string, groups: readonly string[]): boolean {
   let path: string;
@@ -31,16 +25,8 @@ export function isAllowed(uri: string, groups: readonly string[]): boolean {
   const segments = path.slice(1).split("/");
   if (segments.some((s) => s === "." || s === "..")) return false;
 
-  const [first] = segments;
-  if (segments.length === 1 && (first === "" || first === "index.html")) {
-    return true;
-  }
-  if (OPEN_PREFIXES.includes(first)) return true;
-
-  const group = Object.hasOwn(SPACE_GROUPS, first)
-    ? SPACE_GROUPS[first]
-    : undefined;
-  return group !== undefined && groups.includes(group);
+  if (groups.includes(READER_GROUP)) return true;
+  return segments.length > 1 && OPEN_PREFIXES.includes(segments[0]);
 }
 
 export function toObjectKey(uri: string): string {

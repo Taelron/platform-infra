@@ -36,20 +36,11 @@ resource "aws_cognito_user_pool_domain" "readers" {
   managed_login_version = 1
 }
 
-# One group per space. The home page needs none: any signed-in reader opens it.
-locals {
-  spaces = {
-    handbook  = "Taelron Handbook"
-    platform  = "Taelron Platform"
-    fleetdesk = "FleetDesk"
-  }
-}
-
-resource "aws_cognito_user_group" "space" {
-  for_each = local.spaces
-
-  name         = "docs-${each.key}"
-  description  = "Reads the ${each.value} space of Taelron Docs"
+# One group: its members read every page. A signed-in account without it sees
+# only the access-denied page.
+resource "aws_cognito_user_group" "reader" {
+  name         = "docs-reader"
+  description  = "Reads all of Taelron Docs"
   user_pool_id = aws_cognito_user_pool.readers.id
 }
 
