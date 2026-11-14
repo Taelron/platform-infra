@@ -4,45 +4,42 @@ import { strict as assert } from "node:assert";
 import { isAllowed, toObjectKey } from "./spaces.ts";
 
 const none: string[] = [];
-const handbook = ["docs-handbook"];
+const reader = ["docs-reader"];
 
-test("open paths need no group", () => {
-  for (const uri of ["/", "/index.html", "/assets/site.css", "/denied/"]) {
-    assert.equal(isAllowed(uri, none), true, uri);
-  }
-});
-
-test("each space needs its group", () => {
-  assert.equal(isAllowed("/handbook/", handbook), true);
-  assert.equal(isAllowed("/handbook/a/b/", handbook), true);
-  assert.equal(isAllowed("/handbook/", none), false);
-  assert.equal(isAllowed("/platform/", handbook), false);
-  assert.equal(isAllowed("/platform/", ["docs-platform"]), true);
-  assert.equal(isAllowed("/fleetdesk/", ["docs-fleetdesk"]), true);
-  assert.equal(isAllowed("/fleetdesk/", handbook), false);
-});
-
-test("unknown paths are refused", () => {
-  for (const uri of ["/other/", "/favicon.ico", "//handbook/", "/Handbook/"]) {
-    assert.equal(isAllowed(uri, handbook), false, uri);
-  }
-  assert.equal(isAllowed("/constructor/", handbook), false);
-  assert.equal(isAllowed("/__proto__/", handbook), false);
-});
-
-test("encoded and dotted paths cannot reach a space", () => {
+test("a reader opens every page", () => {
   for (const uri of [
-    "/%68andbook/",
+    "/",
+    "/index.html",
+    "/handbook/",
+    "/platform/a/b/",
+    "/fleetdesk/m1-mockups/home.png",
+    "/assets/site.css",
+    "/new-space/",
+  ]) {
+    assert.equal(isAllowed(uri, reader), true, uri);
+  }
+});
+
+test("without the group, only the denied page and its assets", () => {
+  assert.equal(isAllowed("/denied/", none), true);
+  assert.equal(isAllowed("/assets/site.css", none), true);
+  for (const uri of ["/", "/index.html", "/handbook/", "/platform/", "/assets", "/denied"]) {
+    assert.equal(isAllowed(uri, none), false, uri);
+  }
+  assert.equal(isAllowed("/handbook/", ["docs-handbook"]), false);
+});
+
+test("encoded and dotted paths are refused", () => {
+  for (const uri of [
     "/assets/../handbook/",
     "/assets/%2e%2e/handbook/",
     "/assets/..%2fhandbook/",
-    "/assets%2f..%2fhandbook/",
     "/%E0%A4%A",
     "/assets\\..\\handbook/",
   ]) {
     assert.equal(isAllowed(uri, none), false, uri);
+    assert.equal(isAllowed(uri, reader), false, uri);
   }
-  assert.equal(isAllowed("/%68andbook/", handbook), true);
 });
 
 test("a directory serves its index.html", () => {

@@ -9,7 +9,7 @@ the bucket outside Git.
 |------------------|------------------------------------------------|
 | `bucket.tf`      | Private S3 bucket, versioned, eu-central-1     |
 | `certificate.tf` | ACM certificate, us-east-1                     |
-| `cognito.tf`     | User pool, MFA, three groups, one app client   |
+| `cognito.tf`     | User pool, MFA, group `docs-reader`, client    |
 | `edge.tf`        | Lambda@Edge functions, us-east-1               |
 | `cloudfront.tf`  | Distribution and origin access control         |
 | `publish.tf`     | Role `docs-publish` for the publish workflow   |
@@ -22,10 +22,8 @@ The bucket has `prevent_destroy`: it holds the only copy of the pages.
 Every request goes through `check-auth` (viewer request):
 
 - not signed in: redirect to Cognito's sign-in page;
-- `/`, `/assets/*`, `/denied/*`: any signed-in reader;
-- `/handbook/*`, `/platform/*`, `/fleetdesk/*`: the group `docs-handbook`,
-  `docs-platform` or `docs-fleetdesk`;
-- a space without its group, or any other path: the page `/denied/`;
+- in the group `docs-reader`: every page;
+- signed in without it: the page `/denied/` (and `/assets/*`, which it uses);
 - a path ending in `/` serves its `index.html`.
 
 `http-headers` (origin response) adds the security headers and gives every

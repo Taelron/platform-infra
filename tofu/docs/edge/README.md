@@ -9,9 +9,9 @@ OpenTofu (`../edge.tf`) writes each function's `configuration.json` instead.
 
 Changes from upstream, each marked `Taelron Docs` in the code:
 
-- `check-auth`: the reader's Cognito groups are matched against the space in
-  the path (`src/check-auth/spaces.ts`, tested in `spaces.test.ts`); a refused
-  space serves `/denied/index.html`; a path ending in `/` serves its
+- `check-auth`: only the Cognito group `docs-reader` opens the pages
+  (`src/check-auth/spaces.ts`, tested in `spaces.test.ts`); without it, a
+  page serves `/denied/index.html`; a path ending in `/` serves its
   `index.html`.
 - `http-headers`: every page under `/denied/` answers 403.
 - `shared`: the JWKS is optional in the configuration and is fetched from
