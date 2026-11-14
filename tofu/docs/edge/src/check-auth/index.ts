@@ -37,11 +37,11 @@ export const handler: CloudFrontRequestHandler = async (event) => {
     const payload = await CONFIG.jwtVerifier.verify(cookies.idToken);
     CONFIG.logger.debug("JWT payload:", payload);
 
-    // Taelron Docs: only the group docs-reader opens the pages. A refused
+    // Taelron Docs: only the reader group opens the pages. A refused
     // page serves the denied page; the origin-response function gives every
     // page under /denied/ the status 403.
     const groups = payload["cognito:groups"] ?? [];
-    if (!isAllowed(request.uri, groups)) {
+    if (!isAllowed(request.uri, groups, CONFIG.readerGroup)) {
       CONFIG.logger.info("Access refused:", request.uri);
       request.uri = DENIED_PAGE;
       request.querystring = "";
@@ -115,6 +115,10 @@ function redirectToCognitoHostedUI({
     scope: CONFIG.oauthScopes.join(" "),
     code_challenge_method: "S256",
     code_challenge: state.pkceHash,
+    // Taelron Docs: straight to the AWS login, without Cognito's own page.
+    ...(CONFIG.identityProvider
+      ? { identity_provider: CONFIG.identityProvider }
+      : {}),
   });
 
   // Return redirect to Cognito Hosted UI for sign-in

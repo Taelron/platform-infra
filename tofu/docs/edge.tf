@@ -45,6 +45,8 @@ locals {
     cookieCompatibility     = "amplify"
     additionalCookies       = {}
     requiredGroup           = ""
+    readerGroup             = local.reader_group
+    identityProvider        = local.identity_center_provider
   }
 
   # Function name suffix => configuration it reads.

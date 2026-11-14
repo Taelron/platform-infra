@@ -91,6 +91,10 @@ interface ConfigFromDiskComplete extends ConfigFromDiskWithHeaders {
   cookieCompatibility: "amplify" | "elasticsearch";
   additionalCookies: { [name: string]: string };
   requiredGroup: string;
+  // Taelron Docs: the group that opens the pages, and the provider the
+  // sign-in redirect goes to directly.
+  readerGroup: string;
+  identityProvider?: string;
   secretAllowedCharacters?: string;
   pkceLength?: number;
   nonceLength?: number;
