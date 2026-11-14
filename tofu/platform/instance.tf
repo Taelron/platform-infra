@@ -3,15 +3,18 @@
 # for KVM, private address 10.20.1.10, Elastic IP 1 for SSH.
 #
 # Size: r8i.2xlarge (8 vCPU, 64 GB) to start, decided by Gaetan on 14 November
-# 2026; enough for the host and the shared cluster. Resize to r8i.4xlarge
-# before the test and demo clusters: changing instance_type stops, resizes and
-# starts the instance in place, same volumes and addresses.
+# 2026; enough for the host's own services (Phases 3 and 4). Resized to
+# r8i.4xlarge at the start of Phase 5, before the shared VM: the host and the
+# shared VM need 60 GB, and the r8i.2xlarge shows 61. Changing instance_type
+# stops, resizes and starts the instance in place, same volumes and addresses.
 #
 # First apply (14 November 2026) stopped at the instance: AWS answered
 # PendingVerification while it validated the new account's access to
 # eu-central-1. Dry-run launches do not show that check.
 
 locals {
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  host_tags = { Component = "host" }
   # RHEL-9.8.0_HVM-20261021-x86_64-0-Access2-GP3, Red Hat Cloud Access gold
   # image. Pinned: a newer image must never replace the host silently.
   rhel_gold_ami = "ami-0c9e7ae53e5477621"
@@ -21,6 +24,8 @@ locals {
 resource "aws_key_pair" "platform" {
   key_name   = "platform-admin"
   public_key = file("${path.module}/keys/taelron-platform.pub")
+
+  tags = local.host_tags
 }
 
 # --- Instance role: Session Manager and the backup buckets ------------------
@@ -40,6 +45,8 @@ resource "aws_iam_role" "host" {
   name               = "platform-host"
   description        = "platform-aws-01: Session Manager and the backup buckets"
   assume_role_policy = data.aws_iam_policy_document.host_trust.json
+
+  tags = local.host_tags
 }
 
 resource "aws_iam_role_policy_attachment" "host_ssm" {
@@ -70,6 +77,8 @@ resource "aws_iam_role_policy" "host_backups" {
 resource "aws_iam_instance_profile" "host" {
   name = "platform-host"
   role = aws_iam_role.host.name
+
+  tags = local.host_tags
 }
 
 # --- The instance -----------------------------------------------------------
@@ -103,15 +112,15 @@ resource "aws_instance" "host" {
     encrypted             = true
     delete_on_termination = true
 
-    tags = {
+    tags = merge(local.host_tags, {
       Name   = "platform-aws-01-os"
       Backup = "daily"
-    }
+    })
   }
 
-  tags = {
+  tags = merge(local.host_tags, {
     Name = "platform-aws-01"
-  }
+  })
 
   lifecycle {
     prevent_destroy = true
@@ -123,7 +132,7 @@ resource "aws_eip" "ssh" {
   domain   = "vpc"
   instance = aws_instance.host.id
 
-  tags = {
+  tags = merge(local.host_tags, {
     Name = "platform-ssh"
-  }
+  })
 }

@@ -36,3 +36,17 @@ output "host" {
     ssh_ip      = aws_eip.ssh.public_ip
   }
 }
+
+# To enter in Microsoft 365, DNS of taelron.com: one wildcard CNAME per zone
+# to the load balancer (Platform Design Decisions, 12). "host" is relative to
+# taelron.com. If Microsoft 365 refuses a wildcard, one CNAME per name instead.
+output "m365_load_balancer_cnames" {
+  description = "Wildcard CNAME records to the load balancer, for Microsoft 365"
+  value = {
+    for zone in sort(tolist(local.public_zones)) : zone => {
+      type  = "CNAME"
+      host  = "*.${zone}"
+      value = aws_lb.platform.dns_name
+    }
+  }
+}

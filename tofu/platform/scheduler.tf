@@ -2,6 +2,11 @@
 # may stop this one instance and nothing else. For a client trial, disable the
 # schedule in a pull request for its dates.
 
+locals {
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  scheduler_tags = { Component = "scheduler" }
+}
+
 data "aws_iam_policy_document" "scheduler_trust" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -23,6 +28,8 @@ resource "aws_iam_role" "scheduler" {
   name               = "platform-scheduler"
   description        = "EventBridge Scheduler: stop platform-aws-01 at night"
   assume_role_policy = data.aws_iam_policy_document.scheduler_trust.json
+
+  tags = local.scheduler_tags
 }
 
 data "aws_iam_policy_document" "scheduler_stop" {

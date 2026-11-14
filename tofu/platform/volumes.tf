@@ -3,6 +3,8 @@
 # Mounted on the host or given to KVM by Ansible (Phase 4), found by volume id.
 
 locals {
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  storage_tags = { Component = "storage" }
   data_volumes = {
     k3s        = { size = 30, device = "/dev/sdf" }
     postgresql = { size = 80, device = "/dev/sdg" }
@@ -22,10 +24,10 @@ resource "aws_ebs_volume" "data" {
   size              = each.value.size
   encrypted         = true
 
-  tags = {
+  tags = merge(local.storage_tags, {
     Name   = "platform-${each.key}"
     Backup = "daily"
-  }
+  })
 
   lifecycle {
     prevent_destroy = true
@@ -57,6 +59,8 @@ resource "aws_iam_role" "dlm" {
   name               = "platform-dlm"
   description        = "Data Lifecycle Manager: daily snapshots of the platform volumes"
   assume_role_policy = data.aws_iam_policy_document.dlm_trust.json
+
+  tags = local.storage_tags
 }
 
 resource "aws_iam_role_policy_attachment" "dlm" {
@@ -93,7 +97,7 @@ resource "aws_dlm_lifecycle_policy" "daily" {
     }
   }
 
-  tags = {
+  tags = merge(local.storage_tags, {
     Name = "platform-daily-snapshots"
-  }
+  })
 }

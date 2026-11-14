@@ -1,5 +1,10 @@
 # $200 a month for the account, alerts by email at 50, 80 and 100% of the
 # actual spend (Platform Design Decisions, 19).
+
+locals {
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  budget_tags = { Component = "budget" }
+}
 resource "aws_budgets_budget" "monthly" {
   name         = "platform-monthly"
   budget_type  = "COST"
@@ -18,4 +23,6 @@ resource "aws_budgets_budget" "monthly" {
       subscriber_email_addresses = [local.alert_email]
     }
   }
+
+  tags = local.budget_tags
 }
