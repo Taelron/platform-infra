@@ -14,3 +14,10 @@ concern (Platform Runbook, Phase 3). Applied only by GitHub Actions:
 The plan role reads an allowlist (`tofu/bootstrap/github.tf`, `plan_read`). A
 pull request that brings a new AWS service adds its read actions there, applied
 from the RHEL box first.
+
+## Planning from the RHEL box
+
+The SSH source address is personal data and not in Git. GitHub Actions reads it
+from the secret `ADMIN_SSH_CIDR`. On the RHEL box, export the same `/32` at run
+time in `TF_VAR_admin_ssh_cidr` (the box's outbound address, which is fixed),
+then plan with `tofu plan -lock=false`.
