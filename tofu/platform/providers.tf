@@ -12,5 +12,6 @@ provider "aws" {
 }
 
 locals {
-  account_id = "181841605684" # taelron-platform
+  account_id  = "181841605684" # taelron-platform
+  alert_email = "aws@taelron.com"
 }
