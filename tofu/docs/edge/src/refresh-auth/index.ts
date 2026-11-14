@@ -190,9 +190,9 @@ function validateRefreshRequest(
     CONFIG.nonceSigningSecret,
     CONFIG.nonceLength
   );
-  if (calculatedHmac !== nonceHmac) {
-    throw new common.RequiresConfirmationError(
-      `Nonce signature mismatch! Expected ${calculatedHmac} but got ${nonceHmac}`
-    );
+  // Taelron Docs: compared in constant time, and neither value goes in the
+  // message, which reaches the browser: it would hand out a valid signature.
+  if (!common.safeEqual(calculatedHmac, nonceHmac)) {
+    throw new common.RequiresConfirmationError("Nonce signature mismatch");
   }
 }

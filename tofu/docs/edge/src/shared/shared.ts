@@ -4,7 +4,7 @@
 import { CloudFrontHeaders } from "aws-lambda";
 import { readFileSync } from "fs";
 import { formatWithOptions } from "util";
-import { createHmac, randomInt } from "crypto";
+import { createHmac, randomInt, timingSafeEqual } from "crypto";
 import { parse } from "cookie";
 import { fetch } from "./https";
 import { Agent, RequestOptions } from "https";
@@ -680,6 +680,14 @@ export function sign(
     .slice(0, signatureLength);
   const signature = urlSafe.stringify(digest);
   return signature;
+}
+
+// Taelron Docs: constant-time comparison of two signatures.
+export function safeEqual(a: string, b: unknown) {
+  if (typeof b !== "string") return false;
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 export function timestampInSeconds() {

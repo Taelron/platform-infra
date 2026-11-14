@@ -17,5 +17,8 @@ Changes from upstream, each marked `Taelron Docs` in the code:
 - `shared`: the JWKS is optional in the configuration and is fetched from
   Cognito on first use.
 - `parse-auth`: token request headers typed for current `@types/node`.
+- `parse-auth`, `refresh-auth`: the nonce signature is compared in constant
+  time, and the error page no longer shows the expected signature (upstream
+  printed it, which handed out a valid signature for any nonce).
 - Build: one webpack configuration, bundles in `dist/<function>.js`;
   dependencies pinned to exact versions.
