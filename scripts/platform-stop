@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Stops the host platform-aws-01 and waits until it is stopped. The volumes
+# and the Elastic IP stay; only the instance hours stop.
+set -euo pipefail
+
+profile=${AWS_PROFILE:-platform}
+region=eu-central-1
+aws_() { aws --profile "$profile" --region "$region" "$@"; }
+
+if ! aws_ sts get-caller-identity >/dev/null 2>&1; then
+  echo "AWS session expired: run  aws sso login --profile $profile --use-device-code" >&2
+  exit 1
+fi
+
+id=$(aws_ ec2 describe-instances \
+  --filters Name=tag:Name,Values=platform-aws-01 \
+            Name=instance-state-name,Values=pending,running,stopping,stopped \
+  --query 'Reservations[0].Instances[0].InstanceId' --output text)
+[ "$id" != "None" ] || { echo "platform-aws-01 not found" >&2; exit 1; }
+
+aws_ ec2 stop-instances --instance-ids "$id" >/dev/null
+echo "Stopping platform-aws-01 ($id)..."
+aws_ ec2 wait instance-stopped --instance-ids "$id"
+echo "platform-aws-01 is stopped."

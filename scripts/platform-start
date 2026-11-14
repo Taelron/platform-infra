@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Starts the host platform-aws-01 and waits until SSH answers.
+# Uses the AWS profile "platform" (Identity Center); no AWS key.
+set -euo pipefail
+
+profile=${AWS_PROFILE:-platform}
+region=eu-central-1
+aws_() { aws --profile "$profile" --region "$region" "$@"; }
+
+if ! aws_ sts get-caller-identity >/dev/null 2>&1; then
+  echo "AWS session expired: run  aws sso login --profile $profile --use-device-code" >&2
+  exit 1
+fi
+
+id=$(aws_ ec2 describe-instances \
+  --filters Name=tag:Name,Values=platform-aws-01 \
+            Name=instance-state-name,Values=pending,running,stopping,stopped \
+  --query 'Reservations[0].Instances[0].InstanceId' --output text)
+[ "$id" != "None" ] || { echo "platform-aws-01 not found" >&2; exit 1; }
+
+state=$(aws_ ec2 describe-instances --instance-ids "$id" \
+  --query 'Reservations[0].Instances[0].State.Name' --output text)
+if [ "$state" = stopping ]; then
+  echo "platform-aws-01 is stopping; waiting for it to stop first"
+  aws_ ec2 wait instance-stopped --instance-ids "$id"
+  state=stopped
+fi
+if [ "$state" != running ] && [ "$state" != pending ]; then
+  aws_ ec2 start-instances --instance-ids "$id" >/dev/null
+fi
+echo "Starting platform-aws-01 ($id)..."
+aws_ ec2 wait instance-running --instance-ids "$id"
+
+ip=$(aws_ ec2 describe-addresses --filters Name=tag:Name,Values=platform-ssh \
+  --query 'Addresses[0].PublicIp' --output text)
+for _ in $(seq 1 60); do
+  if timeout 3 bash -c "exec 3<>/dev/tcp/$ip/22" 2>/dev/null; then
+    echo "platform-aws-01 is up: ssh ec2-user@$ip"
+    exit 0
+  fi
+  sleep 5
+done
+echo "platform-aws-01 is running but SSH on $ip does not answer yet" >&2
+exit 1
