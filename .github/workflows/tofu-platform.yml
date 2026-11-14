@@ -9,6 +9,7 @@ on:
       - "!tofu/docs/**"
       - ".github/workflows/tofu-platform.yml"
       - ".github/workflows/tofu-root.yml"
+      - "tools/inventory/**"
   push:
     branches: [main]
     paths:
@@ -16,6 +17,7 @@ on:
       - "!tofu/docs/**"
       - ".github/workflows/tofu-platform.yml"
       - ".github/workflows/tofu-root.yml"
+      - "tools/inventory/**"
 
 permissions:
   contents: read
