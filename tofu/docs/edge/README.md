@@ -9,7 +9,10 @@ OpenTofu (`../edge.tf`) writes each function's `configuration.json` instead.
 
 Changes from upstream, each marked `Taelron Docs` in the code:
 
-- `check-auth`: only the Cognito group `docs-reader` opens the pages
+- `check-auth`: only the reader group (`readerGroup` in the configuration:
+  the group Cognito gives users who sign in through IAM Identity Center) opens
+  the pages, and the sign-in redirect names the identity provider
+  (`identityProvider`), so readers go straight to the AWS login
   (`src/check-auth/spaces.ts`, tested in `spaces.test.ts`); without it, a
   page serves `/denied/index.html`; a path ending in `/` serves its
   `index.html`.

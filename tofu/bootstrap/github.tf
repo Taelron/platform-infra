@@ -124,6 +124,7 @@ data "aws_iam_policy_document" "plan_read" {
     actions = [
       "cognito-idp:DescribeUserPool",
       "cognito-idp:DescribeUserPoolClient",
+      "cognito-idp:DescribeIdentityProvider",
       "cognito-idp:DescribeUserPoolDomain",
       "cognito-idp:GetGroup",
       "cognito-idp:GetUserPoolMfaConfig",

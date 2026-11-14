@@ -1,6 +1,7 @@
 // Taelron Docs: which paths a signed-in reader may open.
 //
-//   group docs-reader            every page
+//   the reader group             every page (the group Cognito gives users
+//                                who sign in through IAM Identity Center)
 //   signed in, without it        /assets/* and /denied/* only (the denied
 //                                page and what it needs to display)
 //
@@ -9,11 +10,13 @@
 
 export const DENIED_PAGE = "/denied/index.html";
 
-export const READER_GROUP = "docs-reader";
-
 const OPEN_PREFIXES = ["assets", "denied"];
 
-export function isAllowed(uri: string, groups: readonly string[]): boolean {
+export function isAllowed(
+  uri: string,
+  groups: readonly string[],
+  readerGroup: string
+): boolean {
   let path: string;
   try {
     path = decodeURIComponent(uri);
@@ -25,7 +28,7 @@ export function isAllowed(uri: string, groups: readonly string[]): boolean {
   const segments = path.slice(1).split("/");
   if (segments.some((s) => s === "." || s === "..")) return false;
 
-  if (groups.includes(READER_GROUP)) return true;
+  if (readerGroup !== "" && groups.includes(readerGroup)) return true;
   return segments.length > 1 && OPEN_PREFIXES.includes(segments[0]);
 }
 
