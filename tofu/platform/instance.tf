@@ -6,6 +6,10 @@
 # 2026; enough for the host and the shared cluster. Resize to r8i.4xlarge
 # before the test and demo clusters: changing instance_type stops, resizes and
 # starts the instance in place, same volumes and addresses.
+#
+# First apply (14 November 2026) stopped at the instance: AWS answered
+# PendingVerification while it validated the new account's access to
+# eu-central-1. Dry-run launches do not show that check.
 
 locals {
   # RHEL-9.8.0_HVM-20261021-x86_64-0-Access2-GP3, Red Hat Cloud Access gold
