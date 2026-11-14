@@ -1,6 +1,9 @@
-# The seven data volumes (Platform Design Decisions, 14); the host OS volume is
-# the instance's root volume. gp3, each with its own 3,000 IOPS and 125 MB/s.
-# Mounted on the host or given to KVM by Ansible (Phase 4), found by volume id.
+# The host's data volumes (Platform Design Decisions, 14); the host OS volume
+# is the instance's root volume. gp3, each with its own 3,000 IOPS and
+# 125 MB/s. Mounted on the host by Ansible (Phase 4), found by volume id.
+#
+# Each cluster's volume (shared, test, demo) is created with its cluster in
+# Phase 5, not before: PO decision, 14 November 2026.
 
 locals {
   # Inventory grouping (TAE-156): every taggable resource of this file.
@@ -10,9 +13,6 @@ locals {
     postgresql = { size = 80, device = "/dev/sdg" }
     aap        = { size = 30, device = "/dev/sdh" }
     garage     = { size = 100, device = "/dev/sdi" }
-    shared     = { size = 40, device = "/dev/sdj" }
-    test       = { size = 100, device = "/dev/sdk" }
-    demo       = { size = 100, device = "/dev/sdl" }
   }
 }
 
@@ -29,8 +29,11 @@ resource "aws_ebs_volume" "data" {
     Backup = "daily"
   })
 
+  # Off for one pull request only, to delete the cluster volumes created too
+  # early (shared, test, demo; empty, never snapshotted). The next pull
+  # request turns it back on.
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 }
 
