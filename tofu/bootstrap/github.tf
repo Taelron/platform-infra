@@ -211,7 +211,7 @@ resource "aws_iam_role_policy" "plan_guard" {
   policy = data.aws_iam_policy_document.plan_guard.json
 }
 
-# --- Apply role: `tofu apply` on main, behind the environment "production" ---
+# --- Apply role: `tofu apply` on main, behind the environment "aws-apply" ----
 #
 # The token's subject names the environment. The environment accepts
 # deployments from main only and waits for Gaetan's approval, so this role is
@@ -235,14 +235,14 @@ data "aws_iam_policy_document" "apply_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["${local.oidc_subject_prefix}:environment:production"]
+      values   = ["${local.oidc_subject_prefix}:environment:aws-apply"]
     }
   }
 }
 
 resource "aws_iam_role" "apply" {
   name                 = "platform-github-apply"
-  description          = "GitHub Actions, tofu apply on main in ${local.repository}, environment production"
+  description          = "GitHub Actions, tofu apply on main in ${local.repository}, environment aws-apply"
   assume_role_policy   = data.aws_iam_policy_document.apply_trust.json
   max_session_duration = 3600
 }
@@ -313,7 +313,11 @@ data "aws_iam_policy_document" "apply_guard" {
       "s3:DeleteObjectVersion",
       "s3:PutObjectAcl",
     ]
-    resources = ["${aws_s3_bucket.state.arn}/bootstrap/*"]
+    # The bootstrap and github roots are applied from the RHEL box only.
+    resources = [
+      "${aws_s3_bucket.state.arn}/bootstrap/*",
+      "${aws_s3_bucket.state.arn}/github/*",
+    ]
   }
 }
 

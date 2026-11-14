@@ -9,7 +9,7 @@ The pieces the pipeline needs before it can run, in the account `taelron-platfor
   ever stored in GitHub:
   - `platform-github-plan`: read-only, from pull requests in
     `Taelron/platform-infra`;
-  - `platform-github-apply`: from the environment `production` only, which accepts
+  - `platform-github-apply`: from the environment `aws-apply` only, which accepts
     deployments from `main` only and waits for an approval;
 - the Red Hat Cloud Access role and policy, created by hand in Phase 1 and
   imported here.

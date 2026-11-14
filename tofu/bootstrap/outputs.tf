@@ -9,6 +9,6 @@ output "plan_role_arn" {
 }
 
 output "apply_role_arn" {
-  description = "Role GitHub Actions assumes for tofu apply in environment production"
+  description = "Role GitHub Actions assumes for tofu apply in environment aws-apply"
   value       = aws_iam_role.apply.arn
 }

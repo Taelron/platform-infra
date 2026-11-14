@@ -1,5 +1,5 @@
 # OpenTofu for tofu/platform: plan on each pull request, apply on merge to main
-# after approval in the environment "production". No AWS key: both jobs sign in
+# after approval in the environment "aws-apply". No AWS key: both jobs sign in
 # with GitHub OIDC (roles from tofu/bootstrap).
 name: tofu-platform
 
@@ -103,7 +103,7 @@ jobs:
   apply:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: production
+    environment: aws-apply
     permissions:
       contents: read
       id-token: write
