@@ -9,6 +9,9 @@ on:
       - "tofu/docs/**"
       - ".github/workflows/tofu-docs.yml"
       - ".github/workflows/tofu-root.yml"
+      # A release pull request only writes these: no plan, no apply.
+      - "!**/CHANGELOG.md"
+      - "!**/version.txt"
       - "tools/inventory/**"
   push:
     branches: [main]
@@ -16,6 +19,9 @@ on:
       - "tofu/docs/**"
       - ".github/workflows/tofu-docs.yml"
       - ".github/workflows/tofu-root.yml"
+      # A release pull request only writes these: no plan, no apply.
+      - "!**/CHANGELOG.md"
+      - "!**/version.txt"
       - "tools/inventory/**"
 
 permissions:
