@@ -20,10 +20,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tofu-platform
-  cancel-in-progress: false
-
 env:
   AWS_REGION: eu-central-1
   TOFU_VERSION: 1.13.9
@@ -70,6 +66,9 @@ jobs:
         env:
           # Personal data, kept out of Git (tofu/platform/variables.tf).
           TF_VAR_admin_ssh_cidr: ${{ secrets.ADMIN_SSH_CIDR }}
+          # The posted hash is keyed: the plan holds sensitive values, and a
+          # bare hash of them could be brute-forced from the public comment.
+          PLAN_HASH_KEY: ${{ secrets.PLAN_HASH_KEY }}
         run: |
           tofu plan -no-color -lock-timeout=5m -out=tfplan
           tofu show -no-color tfplan > plan.txt
@@ -78,7 +77,8 @@ jobs:
                 | select(.change.actions != ["no-op"])
                 | {address, actions: .change.actions, after: .change.after,
                    after_unknown: .change.after_unknown}],
-              outputs: (.output_changes // {})}' | sha256sum | cut -d' ' -f1 > plan.sha
+              outputs: (.output_changes // {})}' \
+            | openssl dgst -sha256 -hmac "$PLAN_HASH_KEY" | awk '{print $NF}' > plan.sha
 
       - name: Post the plan
         working-directory: ${{ env.WORKDIR }}
@@ -109,6 +109,12 @@ jobs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     environment: aws-apply
+    # One apply at a time, on the job only: an apply waiting for approval
+    # must not hold back the plans of pull requests (the state lock guards
+    # them).
+    concurrency:
+      group: tofu-platform-apply
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -154,6 +160,9 @@ jobs:
         env:
           # Personal data, kept out of Git (tofu/platform/variables.tf).
           TF_VAR_admin_ssh_cidr: ${{ secrets.ADMIN_SSH_CIDR }}
+          # The posted hash is keyed: the plan holds sensitive values, and a
+          # bare hash of them could be brute-forced from the public comment.
+          PLAN_HASH_KEY: ${{ secrets.PLAN_HASH_KEY }}
         run: |
           tofu init -no-color
           tofu plan -no-color -lock-timeout=5m -out=tfplan
@@ -162,7 +171,8 @@ jobs:
                 | select(.change.actions != ["no-op"])
                 | {address, actions: .change.actions, after: .change.after,
                    after_unknown: .change.after_unknown}],
-              outputs: (.output_changes // {})}' | sha256sum | cut -d' ' -f1 > plan.sha
+              outputs: (.output_changes // {})}' \
+            | openssl dgst -sha256 -hmac "$PLAN_HASH_KEY" | awk '{print $NF}' > plan.sha
 
       - name: Compare with the approved plan
         working-directory: ${{ env.WORKDIR }}
