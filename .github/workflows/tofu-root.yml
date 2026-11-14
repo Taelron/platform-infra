@@ -98,8 +98,13 @@ jobs:
                 | {address, actions: .change.actions, after: .change.after,
                    after_unknown: .change.after_unknown}],
               outputs: (.output_changes // {}
-                | with_entries(select(.value.actions != ["no-op"])))}' \
-            | openssl dgst -sha256 -hmac "$PLAN_HASH_KEY" | awk '{print $NF}' > plan.sha
+                | with_entries(select(.value.actions != ["no-op"])))}' > changes.json
+          openssl dgst -sha256 -hmac "$PLAN_HASH_KEY" < changes.json | awk '{print $NF}' > plan.sha
+          # "false" when the plan changes nothing: the merge then needs no
+          # apply and no approval.
+          jq -r 'if (.resources | length) + (.outputs | length) > 0 then "true" else "false" end' \
+            changes.json > plan.changes
+          rm changes.json
 
       - name: Post the plan
         working-directory: ${{ env.WORKDIR }}
@@ -109,10 +114,10 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           {
-            # Line 2 is the only line the apply job reads: fixed position,
+            # Line 2 is the only line the merge jobs read: fixed position,
             # bound to the pull request's head commit.
             echo "$PLAN_MARKER"
-            echo "plan-hash: \`$(cat plan.sha)\` commit: \`$HEAD_SHA\`"
+            echo "plan-hash: \`$(cat plan.sha)\` commit: \`$HEAD_SHA\` changes: \`$(cat plan.changes)\`"
             echo
             echo "### tofu plan, \`$WORKDIR\`, commit ${HEAD_SHA:0:7}"
             echo
@@ -126,8 +131,51 @@ jobs:
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file comment.md
           cat comment.md >> "$GITHUB_STEP_SUMMARY"
 
-  apply:
+  # Reads the plan approved on the merged pull request, with no AWS access
+  # and no approval. The apply runs, and asks Gaetan, only if that plan
+  # changes something.
+  check:
     if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      pr: ${{ steps.approved.outputs.pr }}
+      hash: ${{ steps.approved.outputs.hash }}
+      changes: ${{ steps.approved.outputs.changes }}
+    steps:
+      - name: Plan approved on the merged pull request
+        id: approved
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The pull request merged as this very commit, and its last plan
+          # was posted by this workflow for its final head commit. A plan
+          # posted before the "changes" field existed counts as changing.
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            --jq '[.[] | select(.merge_commit_sha == env.GITHUB_SHA and .merged_at != null)][0].number // empty')
+          test -n "$pr" || { echo "::error::no pull request merged as $GITHUB_SHA"; exit 1; }
+          head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq '.head.sha')
+          line=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$pr/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .body | split("\n")
+                      | select(.[0] == env.PLAN_MARKER) | .[1]' \
+            | grep -xE "plan-hash: \`[0-9a-f]{64}\` commit: \`$head\`( changes: \`(true|false)\`)?" \
+            | tail -n1)
+          hash=$(grep -oE '[0-9a-f]{64}' <<<"$line" | head -n1)
+          test -n "$hash" || { echo "::error::no plan posted for $head on pull request $pr"; exit 1; }
+          changes=true
+          grep -q 'changes: `false`' <<<"$line" && changes=false
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "changes=$changes" >> "$GITHUB_OUTPUT"
+          if [ "$changes" = false ]; then
+            echo "Plan on pull request $pr changes nothing: no apply, no approval." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  apply:
+    needs: check
+    if: needs.check.outputs.changes == 'true'
     runs-on: ubuntu-latest
     environment: aws-apply
     # One apply per root at a time, on the job only: an apply waiting for
@@ -153,26 +201,6 @@ jobs:
         with:
           tofu_version: ${{ env.TOFU_VERSION }}
           tofu_wrapper: false
-
-      - name: Hash approved on the merged pull request
-        id: approved
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # The pull request merged as this very commit, and its last plan
-          # was posted by this workflow for its final head commit.
-          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
-            --jq '[.[] | select(.merge_commit_sha == env.GITHUB_SHA and .merged_at != null)][0].number // empty')
-          test -n "$pr" || { echo "::error::no pull request merged as $GITHUB_SHA"; exit 1; }
-          head=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr" --jq '.head.sha')
-          hash=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$pr/comments" \
-            --jq '.[] | select(.user.login == "github-actions[bot]") | .body | split("\n")
-                      | select(.[0] == env.PLAN_MARKER) | .[1]' \
-            | grep -xE "plan-hash: \`[0-9a-f]{64}\` commit: \`$head\`" \
-            | tail -n1 | grep -oE '[0-9a-f]{64}' | head -n1)
-          test -n "$hash" || { echo "::error::no plan posted for $head on pull request $pr"; exit 1; }
-          echo "pr=$pr" >> "$GITHUB_OUTPUT"
-          echo "hash=$hash" >> "$GITHUB_OUTPUT"
 
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
@@ -200,8 +228,8 @@ jobs:
       - name: Compare with the approved plan
         working-directory: ${{ env.WORKDIR }}
         env:
-          APPROVED: ${{ steps.approved.outputs.hash }}
-          PR: ${{ steps.approved.outputs.pr }}
+          APPROVED: ${{ needs.check.outputs.hash }}
+          PR: ${{ needs.check.outputs.pr }}
         run: |
           if [ "$(cat plan.sha)" != "$APPROVED" ]; then
             echo "::error::plan differs from the one on pull request $PR; open a new pull request"
