@@ -12,3 +12,18 @@ output "subnet_ids" {
   description = "Public subnets, by zone letter"
   value       = { for k, s in aws_subnet.public : k => s.id }
 }
+
+# To enter in Microsoft 365, DNS of taelron.com: one CNAME per certificate.
+# "host" is the name relative to taelron.com, as the Microsoft 365 form asks.
+output "m365_certificate_validation_records" {
+  description = "CNAME records validating the wildcard certificates, for Microsoft 365"
+  value = {
+    for zone, cert in aws_acm_certificate.wildcard : zone => {
+      for o in cert.domain_validation_options : o.domain_name => {
+        type  = o.resource_record_type
+        host  = trimsuffix(trimsuffix(o.resource_record_name, "."), ".taelron.com")
+        value = trimsuffix(o.resource_record_value, ".")
+      }
+    }
+  }
+}
