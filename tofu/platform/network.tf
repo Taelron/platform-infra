@@ -7,12 +7,14 @@ resource "aws_vpc" "platform" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-vpc"
-  }
+  })
 }
 
 locals {
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  network_tags = { Component = "network" }
   subnets = {
     a = { cidr = "10.20.1.0/24", zone = "eu-central-1a" }
     b = { cidr = "10.20.2.0/24", zone = "eu-central-1b" }
@@ -27,17 +29,17 @@ resource "aws_subnet" "public" {
   availability_zone       = each.value.zone
   map_public_ip_on_launch = false
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-public-${each.key}"
-  }
+  })
 }
 
 resource "aws_internet_gateway" "platform" {
   vpc_id = aws_vpc.platform.id
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-igw"
-  }
+  })
 }
 
 resource "aws_route_table" "public" {
@@ -48,9 +50,9 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.platform.id
   }
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-public"
-  }
+  })
 }
 
 resource "aws_route_table_association" "public" {
@@ -65,9 +67,9 @@ resource "aws_route_table_association" "public" {
 resource "aws_default_security_group" "platform" {
   vpc_id = aws_vpc.platform.id
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-default-deny"
-  }
+  })
 }
 
 # --- Load balancer: HTTPS from anywhere, only to the host -----------------
@@ -77,9 +79,9 @@ resource "aws_security_group" "alb" {
   description = "Load balancer: HTTPS from the internet, to the host only"
   vpc_id      = aws_vpc.platform.id
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-alb"
-  }
+  })
 }
 
 resource "aws_vpc_security_group_ingress_rule" "alb_https" {
@@ -89,6 +91,8 @@ resource "aws_vpc_security_group_ingress_rule" "alb_https" {
   from_port         = 443
   to_port           = 443
   cidr_ipv4         = "0.0.0.0/0"
+
+  tags = local.network_tags
 }
 
 resource "aws_vpc_security_group_egress_rule" "alb_to_host" {
@@ -98,6 +102,8 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_host" {
   from_port                    = 443
   to_port                      = 443
   referenced_security_group_id = aws_security_group.host.id
+
+  tags = local.network_tags
 }
 
 # --- Host: 443 from the load balancer, 22 from the admin address -----------
@@ -107,9 +113,9 @@ resource "aws_security_group" "host" {
   description = "platform-aws-01: HTTPS from the load balancer, SSH from the admin address"
   vpc_id      = aws_vpc.platform.id
 
-  tags = {
+  tags = merge(local.network_tags, {
     Name = "platform-host"
-  }
+  })
 }
 
 resource "aws_vpc_security_group_ingress_rule" "host_https_from_alb" {
@@ -119,6 +125,8 @@ resource "aws_vpc_security_group_ingress_rule" "host_https_from_alb" {
   from_port                    = 443
   to_port                      = 443
   referenced_security_group_id = aws_security_group.alb.id
+
+  tags = local.network_tags
 }
 
 resource "aws_vpc_security_group_ingress_rule" "host_ssh_admin" {
@@ -128,6 +136,8 @@ resource "aws_vpc_security_group_ingress_rule" "host_ssh_admin" {
   from_port         = 22
   to_port           = 22
   cidr_ipv4         = var.admin_ssh_cidr
+
+  tags = local.network_tags
 }
 
 # Out: updates, Red Hat, container images, AWS APIs, S3 backups.
@@ -136,4 +146,6 @@ resource "aws_vpc_security_group_egress_rule" "host_all" {
   description       = "All outbound"
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
+
+  tags = local.network_tags
 }

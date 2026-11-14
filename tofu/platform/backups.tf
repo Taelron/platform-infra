@@ -3,6 +3,8 @@
 # deleted backup stays recoverable for 30 days; retention of the backups
 # themselves is set by pgBackRest and OpenBao.
 locals {
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  backups_tags = { Component = "backups" }
   backup_buckets = {
     pgbackrest = "platform-pgbackrest-${local.account_id}"
     openbao    = "platform-openbao-snapshots-${local.account_id}"
@@ -13,6 +15,8 @@ resource "aws_s3_bucket" "backup" {
   for_each = local.backup_buckets
 
   bucket = each.value
+
+  tags = local.backups_tags
 
   lifecycle {
     prevent_destroy = true

@@ -6,7 +6,9 @@
 # records exist. The load balancer step checks they are issued.
 
 locals {
-  public_zones = toset(["mgmt", "shared", "test", "demo"])
+  # Inventory grouping (TAE-156): every taggable resource of this file.
+  certificates_tags = { Component = "certificates" }
+  public_zones      = toset(["mgmt", "shared", "test", "demo"])
 }
 
 resource "aws_acm_certificate" "wildcard" {
@@ -15,9 +17,9 @@ resource "aws_acm_certificate" "wildcard" {
   domain_name       = "*.${each.key}.taelron.com"
   validation_method = "DNS"
 
-  tags = {
+  tags = merge(local.certificates_tags, {
     Name = "platform-wildcard-${each.key}"
-  }
+  })
 
   lifecycle {
     create_before_destroy = true
