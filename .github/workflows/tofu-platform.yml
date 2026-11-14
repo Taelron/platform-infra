@@ -67,6 +67,9 @@ jobs:
 
       - name: Plan
         working-directory: ${{ env.WORKDIR }}
+        env:
+          # Personal data, kept out of Git (tofu/platform/variables.tf).
+          TF_VAR_admin_ssh_cidr: ${{ secrets.ADMIN_SSH_CIDR }}
         run: |
           tofu plan -no-color -lock-timeout=5m -out=tfplan
           tofu show -no-color tfplan > plan.txt
@@ -148,6 +151,9 @@ jobs:
 
       - name: Plan
         working-directory: ${{ env.WORKDIR }}
+        env:
+          # Personal data, kept out of Git (tofu/platform/variables.tf).
+          TF_VAR_admin_ssh_cidr: ${{ secrets.ADMIN_SSH_CIDR }}
         run: |
           tofu init -no-color
           tofu plan -no-color -lock-timeout=5m -out=tfplan
