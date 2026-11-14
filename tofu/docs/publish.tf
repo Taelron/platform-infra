@@ -1,3 +1,9 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  publish_tags = { Component = "publishing" }
+}
+
 # The publish workflow of Taelron/taelron-docs-site copies the pages to the
 # bucket and invalidates the distribution (TAE-155). It signs in with GitHub
 # OIDC, from main of that repository only: no stored key.
@@ -36,6 +42,8 @@ data "aws_iam_policy_document" "publish_trust" {
 }
 
 resource "aws_iam_role" "publish" {
+  tags = local.publish_tags
+
   name                 = "docs-publish"
   description          = "GitHub Actions, publish workflow of Taelron/taelron-docs-site on main"
   assume_role_policy   = data.aws_iam_policy_document.publish_trust.json

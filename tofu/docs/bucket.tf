@@ -1,6 +1,14 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  bucket_tags = { Component = "hosting" }
+}
+
 # The pages of Taelron Docs, published outside Git, so this
 # versioned bucket is their only copy: it is never destroyed by a plan.
 resource "aws_s3_bucket" "site" {
+  tags = local.bucket_tags
+
   bucket = "docs-site-${local.account_id}"
 
   lifecycle {

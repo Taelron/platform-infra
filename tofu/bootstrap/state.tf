@@ -1,5 +1,13 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  state_tags = { Component = "state" }
+}
+
 # OpenTofu state for every root in this repository, one key per root.
 resource "aws_s3_bucket" "state" {
+  tags = local.state_tags
+
   bucket = "platform-tofu-state-${local.account_id}"
 
   lifecycle {

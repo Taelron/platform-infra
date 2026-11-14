@@ -1,3 +1,9 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  redhat_tags = { Component = "cloud-access" }
+}
+
 # Red Hat Cloud Access: lets Red Hat (cloudigrade) share the RHEL gold images
 # with this account. Created by hand in Phase 1, imported here. The role ARN is
 # registered in the Red Hat Hybrid Cloud Console, so it is never recreated.
@@ -24,6 +30,8 @@ import {
 }
 
 resource "aws_iam_policy" "redhat_cloud_access" {
+  tags = local.redhat_tags
+
   name        = "RedHatCloudAccess"
   description = "Red Hat Cloud Access (cloudigrade): GetCallerIdentity only. To be imported into OpenTofu in phase 3."
 
@@ -43,6 +51,8 @@ resource "aws_iam_policy" "redhat_cloud_access" {
 }
 
 resource "aws_iam_role" "redhat_cloud_access" {
+  tags = local.redhat_tags
+
   name        = "RedHatCloudAccess"
   description = "Assumed by Red Hat (998366406740) with external ID for Cloud Access. To be imported into OpenTofu in phase 3."
 

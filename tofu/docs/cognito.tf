@@ -1,8 +1,16 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  cognito_tags = { Component = "sign-in" }
+}
+
 # The site's own user pool, separate from the platform's. Readers sign in with
 # their AWS login through IAM Identity Center (below); the pool keeps no local
 # accounts and only hands the edge functions their tokens. Its own settings
 # (email, MFA) apply only to local accounts, of which there are none.
 resource "aws_cognito_user_pool" "readers" {
+  tags = local.cognito_tags
+
   name                = "docs-readers"
   deletion_protection = "ACTIVE"
 

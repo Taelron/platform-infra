@@ -1,3 +1,9 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  cloudfront_tags = { Component = "hosting" }
+}
+
 data "aws_cloudfront_cache_policy" "optimized" {
   name = "Managed-CachingOptimized"
 }
@@ -27,6 +33,8 @@ locals {
 }
 
 resource "aws_cloudfront_distribution" "site" {
+  tags = local.cloudfront_tags
+
   comment             = "docs-site: Taelron Docs"
   enabled             = true
   is_ipv6_enabled     = true

@@ -1,5 +1,13 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  github_tags = { Component = "pipeline" }
+}
+
 # GitHub Actions signs in to AWS with OIDC: no access key is stored in GitHub.
 resource "aws_iam_openid_connect_provider" "github" {
+  tags = local.github_tags
+
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
 }
@@ -30,6 +38,8 @@ data "aws_iam_policy_document" "plan_trust" {
 }
 
 resource "aws_iam_role" "plan" {
+  tags = local.github_tags
+
   name                 = "platform-github-plan"
   description          = "GitHub Actions, tofu plan on pull requests in ${local.repository} (read-only)"
   assume_role_policy   = data.aws_iam_policy_document.plan_trust.json
@@ -289,6 +299,8 @@ data "aws_iam_policy_document" "apply_trust" {
 }
 
 resource "aws_iam_role" "apply" {
+  tags = local.github_tags
+
   name                 = "platform-github-apply"
   description          = "GitHub Actions, tofu apply on main in ${local.repository}, environment aws-apply"
   assume_role_policy   = data.aws_iam_policy_document.apply_trust.json
