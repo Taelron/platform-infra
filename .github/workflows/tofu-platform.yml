@@ -8,11 +8,13 @@ on:
     branches: [main]
     paths:
       - "tofu/**"
+      - "!tofu/docs/**"
       - ".github/workflows/tofu-platform.yml"
   push:
     branches: [main]
     paths:
       - "tofu/**"
+      - "!tofu/docs/**"
       - ".github/workflows/tofu-platform.yml"
 
 permissions:
