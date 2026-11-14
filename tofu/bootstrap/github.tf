@@ -128,10 +128,12 @@ data "aws_iam_policy_document" "plan_read" {
     ]
   }
 
-  # Bucket settings, not contents, of the platform's own buckets.
+  # Bucket settings, not contents, of the platform's own buckets. ListBucket
+  # is what HeadBucket needs to read a bucket; it lists keys, never contents.
   statement {
     sid = "PlatformBucketSettings"
     actions = [
+      "s3:ListBucket",
       "s3:GetBucket*",
       "s3:GetAccelerateConfiguration",
       "s3:GetEncryptionConfiguration",
