@@ -62,6 +62,26 @@ data "aws_iam_policy_document" "site" {
     }
   }
 
+  # With ListBucket, S3 answers 404 instead of 403 for a key that does not
+  # exist, so CloudFront can serve the not-found page. No request through
+  # CloudFront lists the bucket: every path is read as one object key.
+  statement {
+    sid       = "CloudFrontNotFound"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.site.arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.site.arn]
+    }
+  }
+
   statement {
     sid     = "DenyInsecureTransport"
     effect  = "Deny"

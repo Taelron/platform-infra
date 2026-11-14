@@ -82,6 +82,16 @@ resource "aws_cloudfront_distribution" "site" {
     }
   }
 
+  # A page that does not exist: the site's own not-found page, published with
+  # the others under site/not-found/, with the status 404. Cached briefly, so
+  # that a page published just after is found.
+  custom_error_response {
+    error_code            = 404
+    response_code         = 404
+    response_page_path    = "/not-found/index.html"
+    error_caching_min_ttl = 10
+  }
+
   restrictions {
     geo_restriction {
       restriction_type = "none"
