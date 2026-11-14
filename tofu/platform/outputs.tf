@@ -27,3 +27,12 @@ output "m365_certificate_validation_records" {
     }
   }
 }
+
+output "host" {
+  description = "platform-aws-01: instance id, private address, SSH address"
+  value = {
+    instance_id = aws_instance.host.id
+    private_ip  = aws_instance.host.private_ip
+    ssh_ip      = aws_eip.ssh.public_ip
+  }
+}
