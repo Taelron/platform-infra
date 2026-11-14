@@ -36,9 +36,116 @@ resource "aws_iam_role" "plan" {
   max_session_duration = 3600
 }
 
-resource "aws_iam_role_policy_attachment" "plan_read_only" {
-  role       = aws_iam_role.plan.name
-  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+# What `tofu plan` of tofu/platform reads, and nothing else. Any pull request
+# can run code with this role, so it gets an allowlist instead of
+# ReadOnlyAccess, which also reads data (logs, items, code, trust policies).
+# The services are those of the Platform Runbook, Phase 3; a pull request that
+# brings a new service adds its read actions here, applied from the RHEL box.
+data "aws_iam_policy_document" "plan_read" {
+  statement {
+    sid       = "PlatformState"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.state.arn}/platform/*"]
+  }
+
+  statement {
+    sid       = "StateBucketList"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.state.arn]
+  }
+
+  # Network, instance, volumes, AMI lookup, load balancer, certificates.
+  statement {
+    sid = "Describe"
+    actions = [
+      "ec2:Describe*",
+      "ec2:GetEbsDefaultKmsKeyId",
+      "ec2:GetEbsEncryptionByDefault",
+      "elasticloadbalancing:Describe*",
+      "acm:DescribeCertificate",
+      "acm:ListCertificates",
+      "acm:ListTagsForCertificate",
+      "dlm:GetLifecyclePolicies",
+      "dlm:GetLifecyclePolicy",
+      "dlm:ListTagsForResource",
+      "scheduler:GetSchedule",
+      "scheduler:GetScheduleGroup",
+      "scheduler:ListSchedules",
+      "scheduler:ListScheduleGroups",
+      "scheduler:ListTagsForResource",
+      "budgets:ViewBudget",
+      "budgets:ListTagsForResource",
+      "kms:DescribeKey",
+      "kms:GetKeyPolicy",
+      "kms:GetKeyRotationStatus",
+      "kms:ListAliases",
+      "kms:ListResourceTags",
+    ]
+    resources = ["*"]
+  }
+
+  # Cognito: reading an app client returns its secret, which the platform
+  # state holds anyway. Accepted: both are readable by the plan of main.
+  statement {
+    sid = "Cognito"
+    actions = [
+      "cognito-idp:DescribeUserPool",
+      "cognito-idp:DescribeUserPoolClient",
+      "cognito-idp:DescribeUserPoolDomain",
+      "cognito-idp:GetGroup",
+      "cognito-idp:GetUserPoolMfaConfig",
+      "cognito-idp:GetUICustomization",
+      "cognito-idp:GetLogDeliveryConfiguration",
+      "cognito-idp:ListGroups",
+      "cognito-idp:ListUserPoolClients",
+      "cognito-idp:ListTagsForResource",
+    ]
+    resources = ["*"]
+  }
+
+  # IAM, only for the platform's own names: never the bootstrap's Red Hat role.
+  statement {
+    sid = "PlatformIam"
+    actions = [
+      "iam:GetRole",
+      "iam:GetRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListRoleTags",
+      "iam:ListInstanceProfilesForRole",
+      "iam:GetInstanceProfile",
+      "iam:ListInstanceProfileTags",
+      "iam:GetPolicy",
+      "iam:GetPolicyVersion",
+      "iam:ListPolicyVersions",
+      "iam:ListPolicyTags",
+    ]
+    resources = [
+      "arn:aws:iam::${local.account_id}:role/platform-*",
+      "arn:aws:iam::${local.account_id}:instance-profile/platform-*",
+      "arn:aws:iam::${local.account_id}:policy/platform-*",
+      "arn:aws:iam::aws:policy/*",
+    ]
+  }
+
+  # Bucket settings, not contents, of the platform's own buckets.
+  statement {
+    sid = "PlatformBucketSettings"
+    actions = [
+      "s3:GetBucket*",
+      "s3:GetAccelerateConfiguration",
+      "s3:GetEncryptionConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetReplicationConfiguration",
+    ]
+    resources = ["arn:aws:s3:::platform-*"]
+  }
+}
+
+resource "aws_iam_role_policy" "plan_read" {
+  name   = "plan-read"
+  role   = aws_iam_role.plan.id
+  policy = data.aws_iam_policy_document.plan_read.json
 }
 
 # A plan takes the state lock: it writes and deletes the .tflock object only.
@@ -56,9 +163,9 @@ resource "aws_iam_role_policy" "plan_state_lock" {
   policy = data.aws_iam_policy_document.plan_state_lock.json
 }
 
-# Any pull request can run code with this role, so ReadOnlyAccess is cut back
-# to metadata: no object or secret contents except the platform state. The
-# bootstrap state holds the Red Hat external ID; the backup buckets hold data.
+# Kept behind the allowlist, so that a read added to it later cannot reach
+# object or secret contents outside the platform state. The bootstrap state
+# and the Red Hat role hold the external ID; the backup buckets hold data.
 data "aws_iam_policy_document" "plan_guard" {
   statement {
     sid           = "DenyObjectReadsOutsidePlatformState"
