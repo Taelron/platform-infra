@@ -80,6 +80,22 @@ data "aws_iam_policy_document" "plan_guard" {
     ]
     resources = ["*"]
   }
+
+  # The Red Hat role's trust policy carries the external ID; the plan of the
+  # platform root never needs it.
+  statement {
+    sid       = "DenyRedHatRoleRead"
+    effect    = "Deny"
+    actions   = ["iam:GetRole"]
+    resources = [aws_iam_role.redhat_cloud_access.arn]
+  }
+
+  statement {
+    sid       = "DenyAccountIamDump"
+    effect    = "Deny"
+    actions   = ["iam:GetAccountAuthorizationDetails"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "plan_guard" {
@@ -156,6 +172,11 @@ data "aws_iam_policy_document" "apply_guard" {
       "iam:CreateUser",
       "iam:CreateAccessKey",
       "iam:CreateLoginProfile",
+      "iam:UpdateLoginProfile",
+      "iam:CreateServiceSpecificCredential",
+      "iam:UploadSSHPublicKey",
+      "iam:UploadSigningCertificate",
+      "iam:CreateVirtualMFADevice",
     ]
     resources = ["*"]
   }
