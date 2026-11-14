@@ -50,3 +50,16 @@ output "m365_load_balancer_cnames" {
     }
   }
 }
+
+# To enter in Microsoft 365, DNS of taelron.com: validates the us-east-1
+# certificate of sso.taelron.com.
+output "m365_sso_certificate_validation" {
+  description = "CNAME record validating the sso.taelron.com certificate, for Microsoft 365"
+  value = {
+    for o in aws_acm_certificate.sso.domain_validation_options : o.domain_name => {
+      type  = o.resource_record_type
+      host  = trimsuffix(trimsuffix(o.resource_record_name, "."), ".taelron.com")
+      value = trimsuffix(o.resource_record_value, ".")
+    }
+  }
+}
