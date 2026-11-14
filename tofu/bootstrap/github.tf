@@ -56,6 +56,38 @@ resource "aws_iam_role_policy" "plan_state_lock" {
   policy = data.aws_iam_policy_document.plan_state_lock.json
 }
 
+# Any pull request can run code with this role, so ReadOnlyAccess is cut back
+# to metadata: no object or secret contents except the platform state. The
+# bootstrap state holds the Red Hat external ID; the backup buckets hold data.
+data "aws_iam_policy_document" "plan_guard" {
+  statement {
+    sid           = "DenyObjectReadsOutsidePlatformState"
+    effect        = "Deny"
+    actions       = ["s3:GetObject", "s3:GetObjectVersion"]
+    not_resources = ["${aws_s3_bucket.state.arn}/platform/*"]
+  }
+
+  statement {
+    sid    = "DenySecretValues"
+    effect = "Deny"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+      "ssm:GetParametersByPath",
+      "ssm:GetParameterHistory",
+      "kms:Decrypt",
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "plan_guard" {
+  name   = "plan-guard"
+  role   = aws_iam_role.plan.id
+  policy = data.aws_iam_policy_document.plan_guard.json
+}
+
 # --- Apply role: `tofu apply` on main, behind the environment "production" ---
 #
 # The token's subject names the environment. The environment accepts
@@ -111,7 +143,21 @@ data "aws_iam_policy_document" "apply_guard" {
       aws_iam_role.plan.arn,
       aws_iam_role.apply.arn,
       aws_iam_openid_connect_provider.github.arn,
+      aws_iam_role.redhat_cloud_access.arn,
+      aws_iam_policy.redhat_cloud_access.arn,
     ]
+  }
+
+  # No long-lived credentials, ever: no IAM users, access keys or passwords.
+  statement {
+    sid    = "DenyLongLivedCredentials"
+    effect = "Deny"
+    actions = [
+      "iam:CreateUser",
+      "iam:CreateAccessKey",
+      "iam:CreateLoginProfile",
+    ]
+    resources = ["*"]
   }
 
   statement {
@@ -131,9 +177,14 @@ data "aws_iam_policy_document" "apply_guard" {
   }
 
   statement {
-    sid       = "DenyBootstrapState"
-    effect    = "Deny"
-    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    sid    = "DenyBootstrapState"
+    effect = "Deny"
+    actions = [
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+      "s3:PutObjectAcl",
+    ]
     resources = ["${aws_s3_bucket.state.arn}/bootstrap/*"]
   }
 }
