@@ -1,7 +1,14 @@
+# Component of every taggable resource in this file (OpenTofu on AWS,
+# pattern 5); merged with the provider's default tags.
+locals {
+  edge_tags = { Component = "sign-in" }
+}
+
 # Lambda@Edge, from aws-samples/cloudfront-authorization-at-edge (edge/),
-# extended so that check-auth matches the reader's Cognito groups against the
-# space in the path. The bundles in edge/dist are built from edge/src and
-# committed; the pipeline checks that they match the source.
+# extended so that check-auth sends readers to IAM Identity Center and opens
+# the pages to the group Cognito gives its users. The bundles in edge/dist are
+# built from edge/src and committed; the pipeline checks that they match the
+# source.
 #
 # Lambda@Edge takes no environment variables: each function reads its
 # configuration from configuration.json, zipped next to its bundle.
@@ -82,6 +89,8 @@ data "aws_iam_policy_document" "edge_trust" {
 }
 
 resource "aws_iam_role" "edge" {
+  tags = local.edge_tags
+
   name               = "docs-edge"
   description        = "Lambda@Edge functions of Taelron Docs"
   assume_role_policy = data.aws_iam_policy_document.edge_trust.json
@@ -112,6 +121,8 @@ data "archive_file" "edge" {
 resource "aws_lambda_function" "edge" {
   for_each = local.edge_functions
   provider = aws.us_east_1
+
+  tags = local.edge_tags
 
   function_name    = "docs-${each.key}"
   role             = aws_iam_role.edge.arn
