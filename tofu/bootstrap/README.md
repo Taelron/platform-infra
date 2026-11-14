@@ -51,6 +51,7 @@ export AWS_PROFILE=platform
 tofu init
 tofu plan -out=bootstrap.tfplan
 tofu apply bootstrap.tfplan
+git fetch --tags
 ../../tools/inventory/publish.sh bootstrap
 ```
 

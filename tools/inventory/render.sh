@@ -30,12 +30,17 @@ body=$(jq -r -s '
   # .summary since TAE-156 review; .details from roots published before it.
   def state_cell: if .summary then .summary | cell else (.details // {}) | detail end;
   def not_listed: .not_listed // .untaggable;
+  # The layer'"'"'s last released tag at the apply; a root in no layer has none.
+  def release_cell:
+    if .release then "<code>\(.release | esc)</code>"
+    elif .layer then "\(.layer | esc), not released"
+    else "—" end;
   (map(.resources[]) ) as $res
   | ($res | group_by(.project // "untagged")) as $projects
   | [
       "<h2 id=\"roots\">Roots</h2>",
-      "<div class=\"table-box\"><table><thead><tr><th>Root</th><th>Last apply (UTC)</th><th>Commit</th><th>Listed</th><th>Not listed</th></tr></thead><tbody>",
-      (sort_by(.root)[] | "<tr><td><code>tofu/\(.root | esc)</code></td><td>\(.generated_at | sub("T"; " ") | sub("Z$"; "") | esc)</td><td><code>\(.commit[0:7] | esc)</code></td><td>\(.resources | length)</td><td>\(not_listed)</td></tr>"),
+      "<div class=\"table-box\"><table><thead><tr><th>Root</th><th>Release</th><th>Last apply (UTC)</th><th>Commit</th><th>Listed</th><th>Not listed</th></tr></thead><tbody>",
+      (sort_by(.root)[] | "<tr><td><code>tofu/\(.root | esc)</code></td><td>\(release_cell)</td><td>\(.generated_at | sub("T"; " ") | sub("Z$"; "") | esc)</td><td><code>\(.commit[0:7] | esc)</code></td><td>\(.resources | length)</td><td>\(not_listed)</td></tr>"),
       "</tbody></table></div>",
       "<h2 id=\"projects\">Projects</h2>",
       "<div class=\"table-box\"><table><thead><tr><th>Project</th><th>Resources</th><th>Components</th></tr></thead><tbody>",
