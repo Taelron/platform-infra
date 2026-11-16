@@ -49,7 +49,8 @@ holds `int.taelron.com`; each cluster's ExternalDNS updates only names under
 (`taelron/platform/bind/<cluster>`) and read at run time; AAP passes
 `bind_update_keys` from its credentials. The zone file is written once only,
 since named keeps the records ExternalDNS adds. Every other name is forwarded
-to the AWS resolver; `rancher.mgmt.taelron.com` answers Rancher's host address.
+to the AWS resolver, without DNSSEC validation (the AWS resolver returns no
+signatures); `rancher.mgmt.taelron.com` answers Rancher's host address.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no
