@@ -7,6 +7,11 @@
     fail_msg: Set aap_installer_file and aap_installer_sha256 in group_vars/all/aap.yml.
     quiet: true
 
+- name: Remove any sudo left over from an install that was cut off
+  ansible.builtin.file:
+    path: /etc/sudoers.d/aap-install
+    state: absent
+
 - name: Read AAP's secrets from pass
   ansible.builtin.set_fact:
     aap_secrets: >-
