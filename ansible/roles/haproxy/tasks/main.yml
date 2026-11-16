@@ -4,11 +4,12 @@
     name: haproxy
     state: present
 
-# AAP's port 9443 has no SELinux type; labelled as an HTTP port so that
-# HAProxy may connect to it, rather than turning on haproxy_connect_any.
-- name: Label AAP's port for HAProxy
+# Two ports have no SELinux type: AAP's 9443, which HAProxy connects to, and
+# HAProxy's metrics port, which it binds. Both are labelled as HTTP ports,
+# rather than turning on haproxy_connect_any.
+- name: Label AAP's port and the metrics port for HAProxy
   community.general.seport:
-    ports: "9443"
+    ports: "9443,{{ haproxy_metrics_bind.split(':') | last }}"
     proto: tcp
     setype: http_port_t
     state: present
