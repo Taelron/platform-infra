@@ -26,3 +26,6 @@
 
 - name: KVM
   ansible.builtin.import_playbook: kvm.yml
+
+- name: K3s and Rancher
+  ansible.builtin.import_playbook: k3s_rancher.yml

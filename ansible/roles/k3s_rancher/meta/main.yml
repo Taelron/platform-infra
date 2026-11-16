@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Taelron
+  description: "The mgmt cluster: k3s on PostgreSQL, Traefik on the loopback, cert-manager and Rancher Manager"
+  license: Apache-2.0
+  min_ansible_version: "2.18"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

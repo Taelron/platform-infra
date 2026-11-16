@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# k3s server on platform-aws-01: the mgmt cluster.
+node-name: {{ inventory_hostname }}
+token: "{{ k3s_rancher_token }}"
+datastore-endpoint: "postgres://k3s:{{ k3s_rancher_db_password }}@{{ postgresql_address }}:5432/k3s?sslmode=require"
+selinux: true
+secrets-encryption: true
+write-kubeconfig-mode: "0600"
+# No bundled load balancer: Traefik runs on the host network instead.
+disable:
+  - servicelb

@@ -1,0 +1,26 @@
+# The mgmt cluster: k3s on the host with Rancher Manager (Platform Design
+# Decisions 6, 10; Where services listen).
+
+# Rancher v2.15.3 supports v1.34 to v1.36 for the cluster it runs on;
+# v1.36.5 is its default.
+k3s_version: v1.36.5+k3s1
+k3s_sha256: d73847bcd3c5fccef0115b372e2f9a91f3032dc84bbf71518a4617565294d313
+k3s_selinux_version: 1.6-1.el9
+# Rancher's RPM signing key, in the role, checked against this fingerprint.
+rancher_rpm_key_fingerprint: C8CFF216455126E9B9C918BE925EA29AE257814A
+
+cert_manager_version: v1.21.3
+rancher_version: 2.15.3
+rancher_hostname: rancher.mgmt.taelron.com
+
+# Traefik, k3s's ingress, on the host network and the loopback only; HAProxy
+# reaches Rancher there (routes and Rancher agents).
+k3s_ingress_bind: 127.0.0.1
+k3s_ingress_https_port: 8443
+k3s_ingress_http_port: 8000
+
+# Secrets, read at run time from pass: the k3s database password
+# (taelron/platform/postgresql/k3s), the k3s server token
+# (taelron/platform/k3s/token, needed to restore k3s from its database) and
+# Rancher's first admin password (taelron/platform/rancher/admin-password,
+# the break-glass account, decision 5).
