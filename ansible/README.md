@@ -27,6 +27,7 @@ inventory.
 | `disks`   | data volumes by EBS ID, XFS, mounted                 |
 | `network` | bridges, host addresses, forwarding, nftables        |
 | `bind`    | internal zone `int.taelron.com`, forwarder           |
+| `postgresql` | PostgreSQL 15, one database per consumer, pgBackRest |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -51,6 +52,18 @@ holds `int.taelron.com`; each cluster's ExternalDNS updates only names under
 since named keeps the records ExternalDNS adds. Every other name is forwarded
 to the AWS resolver, without DNSSEC validation (the AWS resolver returns no
 signatures); `rancher.mgmt.taelron.com` answers Rancher's host address.
+
+`postgresql`: PostgreSQL 15 from the RHEL stream on `192.168.10.11` and
+`127.0.0.1`. One database and one role of the same name per consumer
+(`postgresql_databases`), each allowed only from where it runs: host
+consumers from br-mgmt, the clusters from their VM over TLS (self-signed
+until OpenBao issues it). Passwords are in `pass`
+(`taelron/platform/postgresql/<name>`), set when a role is created. WAL is
+archived to S3 with pgBackRest (bucket `platform-pgbackrest-…`, instance role,
+no key); full backup weekly, differential daily, both run after the next boot
+when the host was stopped. pgBackRest comes from the PGDG repository, limited
+to pgBackRest and its two libraries, signed by PGDG's key (fingerprint in
+`group_vars`).
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

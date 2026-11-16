@@ -1,0 +1,24 @@
+---
+# Self-signed until OpenBao is the internal certificate authority (Phase 5).
+- name: Create the server certificate
+  ansible.builtin.command: >-
+    openssl req -x509 -newkey rsa:3072 -nodes -days 3650
+    -subj /CN={{ postgresql_address }}
+    -addext subjectAltName=IP:{{ postgresql_address }}
+    -keyout /var/lib/pgsql/data/server.key
+    -out /var/lib/pgsql/data/server.crt
+  args:
+    creates: /var/lib/pgsql/data/server.crt
+  notify: Restart postgresql
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Give the certificate to postgres
+  ansible.builtin.file:
+    path: "/var/lib/pgsql/data/{{ item.file }}"
+    owner: postgres
+    group: postgres
+    mode: "{{ item.mode }}"
+  loop:
+    - { file: server.crt, mode: "0644" }
+    - { file: server.key, mode: "0600" }
+  ignore_errors: "{{ ansible_check_mode }}"

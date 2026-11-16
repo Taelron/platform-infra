@@ -11,3 +11,6 @@
 
 - name: BIND
   ansible.builtin.import_playbook: bind.yml
+
+- name: PostgreSQL
+  ansible.builtin.import_playbook: postgresql.yml

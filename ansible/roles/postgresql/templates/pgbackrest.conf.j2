@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+# Backups of the host's PostgreSQL to S3, with the instance role's
+# credentials: no key on the host.
+[global]
+repo1-type=s3
+repo1-s3-bucket={{ pgbackrest_bucket }}
+repo1-s3-endpoint=s3.{{ pgbackrest_region }}.amazonaws.com
+repo1-s3-region={{ pgbackrest_region }}
+repo1-s3-key-type=auto
+repo1-path=/{{ inventory_hostname }}
+repo1-retention-full={{ pgbackrest_retention_full }}
+compress-type=zst
+start-fast=y
+log-level-console=info
+log-level-file=detail
+
+[{{ pgbackrest_stanza }}]
+pg1-path=/var/lib/pgsql/data

@@ -1,0 +1,6 @@
+---
+- name: PostgreSQL
+  hosts: host
+  roles:
+    - role: postgresql
+      tags: [postgresql]

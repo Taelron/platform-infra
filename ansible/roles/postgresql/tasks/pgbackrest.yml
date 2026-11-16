@@ -1,0 +1,40 @@
+---
+- name: Copy the PGDG signing key
+  ansible.builtin.copy:
+    src: PGDG-RPM-GPG-KEY-RHEL
+    dest: /etc/pki/rpm-gpg/PGDG-RPM-GPG-KEY-RHEL
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the PGDG signing key, checked against its fingerprint
+  ansible.builtin.rpm_key:
+    key: /etc/pki/rpm-gpg/PGDG-RPM-GPG-KEY-RHEL
+    fingerprint: "{{ pgdg_key_fingerprint }}"
+    state: present
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Add the PGDG common repository, limited to pgBackRest
+  ansible.builtin.yum_repository:
+    name: pgdg-common
+    description: PostgreSQL common RPMs for RHEL 9 (pgBackRest only)
+    baseurl: https://download.postgresql.org/pub/repos/yum/common/redhat/rhel-9-x86_64/
+    gpgcheck: true
+    gpgkey: file:///etc/pki/rpm-gpg/PGDG-RPM-GPG-KEY-RHEL
+    includepkgs: [pgbackrest, libpq5, pgdg-libssh2]
+    enabled: true
+
+- name: Install pgBackRest {{ pgbackrest_version }}
+  ansible.builtin.dnf:
+    name: "pgbackrest-{{ pgbackrest_version }}"
+    state: present
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Write the pgBackRest configuration
+  ansible.builtin.template:
+    src: pgbackrest.conf.j2
+    dest: /etc/pgbackrest.conf
+    owner: root
+    group: postgres
+    mode: "0640"
+  ignore_errors: "{{ ansible_check_mode }}"
