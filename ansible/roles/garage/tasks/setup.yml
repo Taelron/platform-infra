@@ -1,0 +1,138 @@
+---
+# Through Garage's admin API on the loopback, so that no secret appears on a
+# command line. Every step reads first and changes only what is missing.
+- name: Wait for the Garage admin API
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 3903
+    timeout: 120
+
+- name: Read the cluster status
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/GetClusterStatus
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+  register: garage_status
+  no_log: true
+
+- name: Read the cluster layout
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/GetClusterLayout
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+  register: garage_layout
+  no_log: true
+
+- name: Give this node its role in the layout
+  when: garage_layout.json.roles | length == 0
+  block:
+    - name: Stage the role of this node
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3903/v2/UpdateClusterLayout
+        method: POST
+        headers:
+          Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+        body_format: json
+        # A JSON string, so that capacity stays a number.
+        body: >-
+          {{ {'roles': [{'id': garage_status.json.nodes[0].id,
+                         'zone': inventory_hostname,
+                         'capacity': garage_capacity_bytes | int,
+                         'tags': []}]} | to_json }}
+      changed_when: true
+      no_log: true
+
+    - name: Apply the layout
+      ansible.builtin.uri:
+        url: http://127.0.0.1:3903/v2/ApplyClusterLayout
+        method: POST
+        headers:
+          Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+        body_format: json
+        body: "{{ {'version': garage_layout.json.version + 1} | to_json }}"
+      changed_when: true
+      no_log: true
+
+- name: Look up each key
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:3903/v2/GetKeyInfo?id={{ garage_secrets[item ~ '-key-id'] }}"
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+    status_code: [200, 400, 404, 500]
+  loop: "{{ garage_buckets }}"
+  register: garage_keys
+  no_log: true
+
+- name: Import each missing key from pass
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/ImportKey
+    method: POST
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+    body_format: json
+    body:
+      name: "{{ item.item }}"
+      accessKeyId: "{{ garage_secrets[item.item ~ '-key-id'] }}"
+      secretAccessKey: "{{ garage_secrets[item.item ~ '-key-secret'] }}"
+  loop: "{{ garage_keys.results }}"
+  when: item.status != 200
+  changed_when: true
+  no_log: true
+
+- name: Look up each bucket
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:3903/v2/GetBucketInfo?globalAlias={{ item }}"
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+    status_code: [200, 400, 404, 500]
+  loop: "{{ garage_buckets }}"
+  register: garage_bucket_lookup
+  no_log: true
+
+- name: Create each missing bucket
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/CreateBucket
+    method: POST
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+    body_format: json
+    body:
+      globalAlias: "{{ item.item }}"
+  loop: "{{ garage_bucket_lookup.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.status != 200
+  changed_when: true
+  no_log: true
+
+- name: Read each bucket
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:3903/v2/GetBucketInfo?globalAlias={{ item }}"
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+  loop: "{{ garage_buckets }}"
+  register: garage_bucket_info
+  no_log: true
+
+- name: Allow each key read and write on its own bucket only
+  ansible.builtin.uri:
+    url: http://127.0.0.1:3903/v2/AllowBucketKey
+    method: POST
+    headers:
+      Authorization: "Bearer {{ garage_secrets['admin-token'] }}"
+    body_format: json
+    body:
+      bucketId: "{{ item.json.id }}"
+      accessKeyId: "{{ garage_secrets[item.item ~ '-key-id'] }}"
+      permissions:
+        read: true
+        write: true
+        owner: false
+  loop: "{{ garage_bucket_info.results }}"
+  when: >-
+    item.json['keys']
+    | selectattr('accessKeyId', 'equalto', garage_secrets[item.item ~ '-key-id'])
+    | selectattr('permissions.read') | selectattr('permissions.write')
+    | list | length == 0
+  changed_when: true
+  no_log: true

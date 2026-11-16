@@ -1,0 +1,85 @@
+---
+- name: Read the Garage secrets from pass
+  ansible.builtin.set_fact:
+    garage_secrets: >-
+      {{ (garage_secrets | default({}))
+         | combine({item: lookup('community.general.passwordstore', 'taelron/platform/garage/' ~ item)}) }}
+  loop: >-
+    {{ ['rpc-secret', 'admin-token', 'metrics-token']
+       + (garage_buckets | product(['-key-id', '-key-secret']) | map('join') | list) }}
+  when: garage_secrets is not defined or item not in garage_secrets
+  no_log: true
+
+# The container reads its files with the SELinux type container_file_t,
+# recorded as a file-context rule so a relabel keeps it.
+- name: Label the Garage files for the container
+  community.general.sefcontext:
+    target: "{{ item }}(/.*)?"
+    setype: container_file_t
+    state: present
+  loop: [/var/lib/garage, /etc/garage]
+  register: garage_fcontext
+
+- name: Apply the labels
+  ansible.builtin.command: restorecon -R {{ item.item }}
+  loop: "{{ garage_fcontext.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item is changed and not ansible_check_mode
+  changed_when: true
+
+- name: Create the configuration folder
+  ansible.builtin.file:
+    path: /etc/garage
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+    setype: container_file_t
+
+- name: Write the Garage configuration
+  ansible.builtin.template:
+    src: garage.toml.j2
+    dest: /etc/garage/garage.toml
+    owner: root
+    group: root
+    mode: "0600"
+    setype: container_file_t
+  no_log: true
+  notify: Restart garage
+
+- name: Check whether the Garage image is present
+  ansible.builtin.command: podman image exists {{ garage_image }}
+  register: garage_image_present
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Pull the Garage image {{ garage_version }}
+  ansible.builtin.command: podman pull {{ garage_image }}
+  when: garage_image_present.rc != 0
+  changed_when: true
+
+- name: Install the Garage unit
+  ansible.builtin.template:
+    src: garage.container.j2
+    dest: /etc/containers/systemd/garage.container
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart garage
+
+- name: Flush handlers so systemd generates the unit
+  ansible.builtin.meta: flush_handlers
+
+- name: Run Garage
+  ansible.builtin.systemd_service:
+    name: garage
+    state: started
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Set up the layout, keys and buckets
+  ansible.builtin.import_tasks: setup.yml
+  when: not ansible_check_mode

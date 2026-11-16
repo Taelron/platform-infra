@@ -14,3 +14,6 @@
 
 - name: PostgreSQL
   ansible.builtin.import_playbook: postgresql.yml
+
+- name: Garage
+  ansible.builtin.import_playbook: garage.yml
