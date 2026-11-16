@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+# Garage {{ garage_version }} on platform-aws-01: one node, no replication.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "lmdb"
+replication_factor = 1
+
+# Cluster RPC: one node, so only on the loopback.
+rpc_bind_addr = "127.0.0.1:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "{{ garage_secrets['rpc-secret'] }}"
+
+[s3_api]
+s3_region = "{{ garage_s3_region }}"
+api_bind_addr = "{{ garage_address }}:{{ garage_s3_port }}"
+
+# Admin API and metrics: loopback only.
+[admin]
+api_bind_addr = "127.0.0.1:3903"
+admin_token = "{{ garage_secrets['admin-token'] }}"
+metrics_token = "{{ garage_secrets['metrics-token'] }}"

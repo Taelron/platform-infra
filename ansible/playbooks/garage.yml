@@ -1,0 +1,6 @@
+---
+- name: Garage
+  hosts: host
+  roles:
+    - role: garage
+      tags: [garage]

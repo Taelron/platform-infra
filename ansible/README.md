@@ -28,6 +28,7 @@ inventory.
 | `network` | bridges, host addresses, forwarding, nftables        |
 | `bind`    | internal zone `int.taelron.com`, forwarder           |
 | `postgresql` | PostgreSQL 15, one database per consumer, pgBackRest |
+| `garage`  | S3 object storage for Mimir, Loki, Tempo             |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -65,6 +66,15 @@ empty, so a shutdown never waits on a failing push); full backup weekly, differe
 when the host was stopped. pgBackRest comes from the PGDG repository, limited
 to pgBackRest and its two libraries, signed by PGDG's key (fingerprint in
 `group_vars`).
+
+`garage`: Garage (S3 API) on `192.168.10.14:3900`, one node, data on the
+Garage volume. It runs as a Podman container (Quadlet unit `garage`), pinned
+by image digest, with host networking so the firewall's flow 9 applies, a
+read-only root filesystem and no capabilities; its files carry the SELinux
+type `container_file_t`. The admin API listens on `127.0.0.1:3903` only; the
+role sets up the layout, one bucket and one key per consumer (read and write
+on its own bucket only) through it, so no secret appears on a command line.
+Secrets and keys are in `pass` (`taelron/platform/garage/…`).
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

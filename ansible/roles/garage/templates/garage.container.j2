@@ -1,0 +1,26 @@
+# {{ ansible_managed }}
+# Garage {{ garage_version }}, run by Podman (Quadlet). Host networking: it
+# listens on {{ garage_address }}:{{ garage_s3_port }} (br-mgmt), the admin
+# API on 127.0.0.1:3903, so the host firewall's flow 9 applies directly.
+[Unit]
+Description=Garage object storage
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image={{ garage_image }}
+ContainerName=garage
+Network=host
+Volume=/etc/garage/garage.toml:/etc/garage.toml:ro
+Volume=/var/lib/garage:/var/lib/garage
+NoNewPrivileges=true
+DropCapability=all
+ReadOnly=true
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
