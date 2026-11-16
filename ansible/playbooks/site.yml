@@ -17,3 +17,9 @@
 
 - name: Garage
   ansible.builtin.import_playbook: garage.yml
+
+- name: HAProxy
+  ansible.builtin.import_playbook: haproxy.yml
+
+- name: Alloy
+  ansible.builtin.import_playbook: alloy.yml

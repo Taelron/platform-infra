@@ -1,0 +1,6 @@
+---
+- name: Restart alloy
+  ansible.builtin.systemd_service:
+    name: alloy
+    state: restarted
+  ignore_errors: "{{ ansible_check_mode }}"
