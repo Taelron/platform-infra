@@ -23,3 +23,6 @@
 
 - name: Alloy
   ansible.builtin.import_playbook: alloy.yml
+
+- name: KVM
+  ansible.builtin.import_playbook: kvm.yml

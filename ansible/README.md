@@ -31,6 +31,7 @@ inventory.
 | `garage`  | S3 object storage for Mimir, Loki, Tempo             |
 | `haproxy` | public names, Rancher agents, health check           |
 | `alloy`   | host metrics and logs (sends from Phase 5)           |
+| `kvm`     | KVM and libvirt, no NAT network                      |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -92,6 +93,9 @@ than a health check, counts as activity; Rancher agents do not.
 Alloy; each package's signature checked against the pinned key). Until
 Mimir and Loki exist in shared (Phase 5), `alloy_remote_enabled` is false and
 Alloy sends nothing; its UI stays on `127.0.0.1:12345`.
+
+`kvm`: KVM and libvirt (modular daemons, started by their sockets). libvirt's
+default NAT network is removed: the cluster VMs use the four bridges only.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

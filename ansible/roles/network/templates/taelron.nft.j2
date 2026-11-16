@@ -5,6 +5,19 @@
 # is dropped. Only this table is replaced on reload: tables of libvirt, podman
 # or k3s are left alone.
 
+{#- One nftables rule per protocol of a flow. Every match is optional. -#}
+{% macro rules(f) -%}
+{% set protos = ([f.proto] if f.proto is string else f.proto) if f.proto is defined else [none] %}
+{% for p in protos %}
+    {% if f.iif is defined %}iifname { {{ f.iif | map('to_json') | join(', ') }} } {% endif -%}
+    {% if f.oif is defined %}oifname { {{ f.oif | map('to_json') | join(', ') }} } {% endif -%}
+    {% if f.saddr is defined %}ip saddr { {{ f.saddr | join(', ') }} } {% endif -%}
+    {% if f.daddr is defined %}ip daddr { {{ f.daddr | join(', ') }} } {% endif -%}
+    {% if p and f.dport is defined %}{{ p }} dport { {{ f.dport | join(', ') }} } {% elif p %}meta l4proto {{ p }} {% endif -%}
+    {{ f.action | default('accept') }}
+{% endfor %}
+{%- endmacro %}
+
 table inet taelron
 delete table inet taelron
 
@@ -30,7 +43,7 @@ table inet taelron {
 {% endfor %}
 {% endfor %}
 {% else %}
-    iifname { {{ f.iif | map('to_json') | join(', ') }} }{% if f.saddr is defined %} ip saddr { {{ f.saddr | join(', ') }} }{% endif %}{% if f.daddr is defined %} ip daddr { {{ f.daddr | join(', ') }} }{% endif %} {{ f.proto }} dport { {{ f.dport | join(', ') }} } {{ f.action | default('accept') }}
+{{ rules(f) }}
 {% endif %}
 {% endfor %}
   }
@@ -41,13 +54,13 @@ table inet taelron {
     ct state invalid drop
 {% for f in nft_flows if f.chain == 'forward' and (f.action | default('accept')) == 'drop' %}
     # Flow {{ f.id }}: {{ f.why }}
-    iifname { {{ f.iif | map('to_json') | join(', ') }} } oifname { {{ f.oif | map('to_json') | join(', ') }} } drop
+{{ rules(f) }}
 {% endfor %}
     ct state established,related accept
 
 {% for f in nft_flows if f.chain == 'forward' and (f.action | default('accept')) == 'accept' %}
     # Flow {{ f.id }}: {{ f.why }}
-    iifname { {{ f.iif | map('to_json') | join(', ') }} } oifname { {{ f.oif | map('to_json') | join(', ') }} } ip daddr { {{ f.daddr | join(', ') }} } {{ f.proto }} dport { {{ f.dport | join(', ') }} } accept
+{{ rules(f) }}
 {% endfor %}
   }
 
