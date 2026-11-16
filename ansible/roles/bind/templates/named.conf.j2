@@ -32,7 +32,10 @@ options {
 
   forwarders { {{ aws_resolver }}; };
   forward only;
-  dnssec-validation auto;
+  // The AWS resolver does not return DNSSEC signatures, so BIND cannot
+  // validate what it forwards (measured: "broken trust chain", SERVFAIL).
+  // The VPC resolver is the point of trust for names outside the platform.
+  dnssec-validation no;
 
   version none;
 };
@@ -66,4 +69,3 @@ zone "{{ o.name }}" IN {
 };
 
 {% endfor %}
-include "/etc/named.root.key";
