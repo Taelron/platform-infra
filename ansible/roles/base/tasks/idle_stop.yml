@@ -1,0 +1,50 @@
+---
+- name: Create the idle stop folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/platform-idle
+    - /etc/platform-idle/activity.d
+    - /var/lib/platform-idle
+
+- name: Write the idle stop settings
+  ansible.builtin.template:
+    src: platform-idle.conf.j2
+    dest: /etc/platform-idle/config
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install the idle check
+  ansible.builtin.copy:
+    src: platform-idle-check
+    dest: /usr/local/sbin/platform-idle-check
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the idle check units
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - platform-idle.service
+    - platform-idle.timer
+  notify: Reload systemd
+
+- name: Flush handlers so systemd knows the units
+  ansible.builtin.meta: flush_handlers
+
+- name: Run the idle check every minute, or not during a client trial
+  ansible.builtin.systemd_service:
+    name: platform-idle.timer
+    state: "{{ 'started' if idle_stop_enabled else 'stopped' }}"
+    enabled: "{{ idle_stop_enabled }}"
+  ignore_errors: "{{ ansible_check_mode }}"

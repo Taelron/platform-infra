@@ -18,6 +18,10 @@
     },
     "tofu/platform": {
       "component": "foundation"
+    },
+    "ansible": {
+      "component": "core",
+      "release-as": "1.0.0"
     }
   }
 }

@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Taelron
+  description: Base RHEL for platform-aws-01 — SELinux, SSH by key only, firewalld off, security updates, SSM Agent, idle stop
+  license: Apache-2.0
+  min_ansible_version: "2.18"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

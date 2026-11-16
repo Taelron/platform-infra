@@ -1,0 +1,32 @@
+---
+- name: Read the installed packages
+  ansible.builtin.package_facts:
+
+- name: Install the pinned Amazon SSM Agent
+  when: >-
+    'amazon-ssm-agent' not in ansible_facts.packages
+    or ansible_facts.packages['amazon-ssm-agent'][0].version != ssm_agent_version
+  block:
+    - name: Download the Amazon SSM Agent package
+      ansible.builtin.get_url:
+        url: "https://s3.{{ base_aws_region }}.amazonaws.com/amazon-ssm-{{ base_aws_region }}/{{ ssm_agent_version }}/linux_amd64/amazon-ssm-agent.rpm"
+        dest: "/var/cache/amazon-ssm-agent-{{ ssm_agent_version }}.rpm"
+        checksum: "sha256:{{ ssm_agent_sha256 }}"
+        mode: "0644"
+
+    # The package is checked by its pinned SHA-256 above, which pins the exact
+    # bytes; AWS's signing key is not installed on the host.
+    - name: Install the Amazon SSM Agent package
+      ansible.builtin.dnf:
+        name: "/var/cache/amazon-ssm-agent-{{ ssm_agent_version }}.rpm"
+        state: present
+        disable_gpg_check: true
+      # In check mode the package was not downloaded.
+      ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Run the Amazon SSM Agent
+  ansible.builtin.systemd_service:
+    name: amazon-ssm-agent
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"

@@ -1,0 +1,4 @@
+---
+# Every role of the host, in order. Each role also has its own playbook and tag.
+- name: Base RHEL
+  ansible.builtin.import_playbook: base.yml

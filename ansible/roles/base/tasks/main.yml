@@ -1,0 +1,73 @@
+---
+- name: Read the subscription status
+  ansible.builtin.command: subscription-manager status
+  register: base_subscription
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Check that RHEL is registered
+  ansible.builtin.assert:
+    that: "'Overall Status: Registered' in base_subscription.stdout"
+    fail_msg: >-
+      RHEL is not registered. Register it with the developer subscription
+      (subscription-manager register) before running this role.
+    quiet: true
+
+- name: Keep SELinux enforcing
+  ansible.posix.selinux:
+    policy: targeted
+    state: enforcing
+
+- name: Read the services
+  ansible.builtin.service_facts:
+
+- name: Turn firewalld off (nftables manages the firewall directly)
+  ansible.builtin.systemd_service:
+    name: firewalld
+    state: stopped
+    enabled: false
+    masked: true
+  when: "'firewalld.service' in ansible_facts.services"
+
+- name: Allow SSH by key only
+  ansible.builtin.template:
+    src: sshd-taelron.conf.j2
+    dest: /etc/ssh/sshd_config.d/10-taelron.conf
+    owner: root
+    group: root
+    mode: "0600"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd
+
+- name: Install dnf-automatic
+  ansible.builtin.dnf:
+    name: dnf-automatic
+    state: present
+
+- name: Apply security updates automatically
+  community.general.ini_file:
+    path: /etc/dnf/automatic.conf
+    section: commands
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: "0644"
+  loop:
+    - { option: upgrade_type, value: security }
+    - { option: apply_updates, value: "yes" }
+  loop_control:
+    label: "{{ item.option }}"
+
+- name: Run dnf-automatic daily
+  ansible.builtin.systemd_service:
+    name: dnf-automatic.timer
+    state: started
+    enabled: true
+  # In check mode dnf-automatic is not installed yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Install the Amazon SSM Agent
+  ansible.builtin.import_tasks: ssm.yml
+
+- name: Install the idle stop
+  ansible.builtin.import_tasks: idle_stop.yml

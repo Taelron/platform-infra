@@ -1,0 +1,6 @@
+---
+- name: Base RHEL
+  hosts: host
+  roles:
+    - role: base
+      tags: [base]

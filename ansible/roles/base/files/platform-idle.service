@@ -1,0 +1,6 @@
+[Unit]
+Description=Power off platform-aws-01 when idle
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/platform-idle-check

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Idle stop of platform-aws-01 (Platform Design Decisions, 19).
+# Run every minute by platform-idle.timer. The host counts as active while an
+# SSH session is open, or while a program in /etc/platform-idle/activity.d/
+# exits 0 (HAProxy adds one that ignores the load balancer's health checks).
+# After IDLE_MINUTES without activity, the host powers off; AWS then stops the
+# instance (instance-initiated shutdown behaviour: stop).
+set -euo pipefail
+
+# shellcheck source=/dev/null
+. /etc/platform-idle/config
+state=/var/lib/platform-idle/last-activity
+
+active=no
+if ss -Htn state established '( sport = :22 )' | grep -q .; then
+  active=ssh
+fi
+if [ "$active" = no ]; then
+  for check in /etc/platform-idle/activity.d/*; do
+    [ -x "$check" ] || continue
+    if "$check"; then
+      active=$(basename "$check")
+      break
+    fi
+  done
+fi
+
+now=$(date +%s)
+if [ "$active" != no ]; then
+  touch "$state"
+  exit 0
+fi
+
+boot=$(date -d "$(uptime -s)" +%s)
+last=$boot
+if [ -f "$state" ]; then
+  seen=$(stat -c %Y "$state")
+  [ "$seen" -gt "$last" ] && last=$seen
+fi
+
+idle=$(( (now - last) / 60 ))
+if [ "$idle" -ge "$IDLE_MINUTES" ]; then
+  logger -t platform-idle "idle for ${idle} minutes (limit ${IDLE_MINUTES}): powering off"
+  systemctl poweroff
+fi
