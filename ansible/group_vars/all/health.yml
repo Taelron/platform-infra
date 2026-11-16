@@ -1,0 +1,28 @@
+# The platform health check (playbooks/health.yml): read-only.
+
+# HAProxy routes whose service is not built yet. Their backend is DOWN and
+# their public name answers 503 by design, so they show EXPECTED, not FAIL.
+# Remove a name when its phase builds it: aap in Phase 4 step 8, the clusters
+# in Phase 5.
+health_not_built: [aap, shared, test, demo]
+
+# Units that must be active.
+health_units:
+  - taelron-nft
+  - named
+  - postgresql
+  - garage
+  - haproxy
+  - alloy
+  - k3s
+  - virtqemud.socket
+  - amazon-ssm-agent
+  - platform-idle.timer
+  - pgbackrest-full.timer
+  - pgbackrest-diff.timer
+  - dnf-automatic.timer
+
+# The daily differential backup, with margin.
+health_backup_max_age_hours: 30
+# The host's own certificates (HAProxy, PostgreSQL) must stay valid this long.
+health_cert_min_days: 30

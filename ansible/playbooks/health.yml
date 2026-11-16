@@ -1,0 +1,170 @@
+---
+# Platform health: read-only, changes nothing. Prints one line per check
+# (OK, EXPECTED or FAIL) and fails if any check fails. EXPECTED is a route
+# whose service is not built yet (health_not_built).
+- name: Platform health
+  hosts: host
+  gather_facts: false
+  become: true
+  # Every task only reads, so it runs the same under --check.
+  check_mode: false
+  vars:
+    health_probes:
+      - area: host
+        check: SELinux enforcing
+        cmd: test "$(getenforce)" = Enforcing
+      - area: host
+        check: nftables table inet taelron
+        cmd: nft list table inet taelron >/dev/null
+      - area: host
+        check: data volumes mounted
+        cmd: >-
+          for m in {{ data_volumes | map(attribute='mount') | join(' ') }};
+          do findmnt -n "$m" >/dev/null || echo "not mounted: $m"; done | grep . && exit 1 || exit 0
+      - area: host
+        check: units active
+        cmd: >-
+          for u in {{ health_units | join(' ') }};
+          do systemctl is-active -q "$u" || echo "inactive: $u"; done | grep . && exit 1 || exit 0
+      - area: bind
+        check: "{{ rancher_hostname }} = {{ rancher_address }}"
+        cmd: test "$(dig @127.0.0.1 +short {{ rancher_hostname }})" = {{ rancher_address }}
+      - area: bind
+        check: zone {{ dns_internal_zone }}
+        cmd: test "$(dig @127.0.0.1 +short ns.{{ dns_internal_zone }})" = {{ bridges[0].prefix }}.1
+      - area: bind
+        check: forwards to the AWS resolver
+        cmd: dig @127.0.0.1 +short aws.amazon.com | grep -q .
+      - area: postgresql
+        check: accepts connections on {{ postgresql_address }}
+        cmd: pg_isready -q -h {{ postgresql_address }}
+      - area: postgresql
+        check: TLS on
+        cmd: cd / && runuser -u postgres -- psql -Atc 'show ssl' | grep -qx on
+      - area: postgresql
+        check: WAL archiving to S3
+        cmd: >-
+          cd / && runuser -u postgres -- psql -Atc
+          'select last_failed_time is null or last_failed_time < last_archived_time from pg_stat_archiver'
+          | grep -qx t
+      - area: postgresql
+        check: HAProxy and PostgreSQL certificates
+        cmd: >-
+          for c in /etc/haproxy/certs/host.pem /var/lib/pgsql/data/server.crt;
+          do openssl x509 -in "$c" -noout -checkend {{ health_cert_min_days * 86400 }} >/dev/null
+          || echo "expires within {{ health_cert_min_days }} days: $c"; done | grep . && exit 1 || exit 0
+      - area: garage
+        check: cluster healthy
+        cmd: curl -fsS -o /dev/null http://127.0.0.1:3903/health
+      - area: k3s
+        check: node Ready
+        cmd: /usr/local/bin/k3s kubectl wait node --all --for=condition=Ready --timeout=5s >/dev/null
+      - area: k3s
+        check: every deployment available
+        cmd: >-
+          /usr/local/bin/k3s kubectl wait deploy -A --all --for=condition=Available --timeout=5s >/dev/null
+  tasks:
+    - name: Run the host checks
+      ansible.builtin.shell:
+        cmd: "set -o pipefail; {{ item.cmd }}"
+        executable: /bin/bash
+      loop: "{{ health_probes }}"
+      loop_control:
+        label: "{{ item.area }}: {{ item.check }}"
+      register: health_host
+      changed_when: false
+      failed_when: false
+
+    - name: Read pgBackRest's state
+      ansible.builtin.command:
+        cmd: runuser -u postgres -- pgbackrest --stanza={{ pgbackrest_stanza }} info --output=json
+        chdir: /
+      register: health_pgbackrest
+      changed_when: false
+      failed_when: false
+
+    - name: Read HAProxy's backend states
+      ansible.builtin.uri:
+        url: "http://{{ haproxy_metrics_bind }}/metrics"
+        return_content: true
+      register: health_haproxy
+      failed_when: false
+
+    - name: Read the clock
+      ansible.builtin.command: date +%s
+      register: health_now
+      changed_when: false
+
+    # From the machine running the playbook, through the load balancer, with
+    # the certificate checked.
+    - name: Ask each public name
+      ansible.builtin.uri:
+        url: "https://{{ item.hosts[0] if item.hosts is defined else 'check' ~ item.domain }}/"
+        follow_redirects: none
+        timeout: 10
+      loop: "{{ haproxy_routes }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: health_public
+      delegate_to: localhost
+      become: false
+      failed_when: false
+
+    - name: Grade the checks
+      ansible.builtin.set_fact:
+        health_results: >-
+          {{ (host_results | from_json) + backup_result + (haproxy_results | from_json)
+          + (public_results | from_json) }}
+      vars:
+        host_results: >-
+          [{% for r in health_host.results %}
+          {"area": "{{ r.item.area }}", "check": {{ r.item.check | to_json }},
+           "state": "{{ 'OK' if r.rc == 0 else 'FAIL' }}",
+           "detail": {{ (r.stdout_lines | last | default('')) | to_json }}}{{ '' if loop.last else ',' }}
+          {% endfor %}]
+        stanza: "{{ (health_pgbackrest.stdout | default('[]', true) | from_json | first) | default({}) }}"
+        last_backup: "{{ (stanza.backup | default([]) | last) | default({}) }}"
+        backup_age_hours: >-
+          {{ ((health_now.stdout | int) - (last_backup.timestamp.stop | default(0))) // 3600 }}
+        backup_result:
+          - area: postgresql
+            check: pgBackRest backup within {{ health_backup_max_age_hours }} h
+            state: >-
+              {{ 'OK' if (stanza.status.code | default(-1)) == 0 and not (last_backup.error | default(true))
+              and (backup_age_hours | int) < health_backup_max_age_hours else 'FAIL' }}
+            detail: "{{ last_backup.label | default('no backup') }}, {{ backup_age_hours }} h ago"
+        backends: >-
+          {{ dict(health_haproxy.content | default('')
+          | regex_findall('haproxy_backend_status\{proxy="be_(\w+)",state="(\w+)"\} 1')) }}
+        haproxy_results: >-
+          [{% for name in haproxy_routes | map(attribute='name') | list + ['rancher_agents'] %}
+          {% set up = backends[name] | default('missing') == 'UP' %}
+          {"area": "haproxy", "check": "backend be_{{ name }}",
+           "state": "{{ 'OK' if up else ('EXPECTED' if name in health_not_built else 'FAIL') }}",
+           "detail": "{{ backends[name] | default('missing') }}"}{{ '' if loop.last else ',' }}
+          {% endfor %}]
+        public_results: >-
+          [{% for r in health_public.results %}
+          {% set ok = r.status | default(-1) >= 200 and r.status | default(-1) < 500 %}
+          {% set built = r.item.name not in health_not_built %}
+          {"area": "public", "check": "{{ r.url | default(r.item.name) }}",
+           "state": "{{ 'OK' if ok else ('EXPECTED' if not built and r.status | default(-1) == 503 else 'FAIL') }}",
+           "detail": "{{ r.status | default(-1) }}{{ ', built: remove from health_not_built' if ok and not built else '' }}"}{{ '' if loop.last else ',' }}
+          {% endfor %}]
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: >-
+          {{ report | from_json }}
+      vars:
+        report: >-
+          [{% for r in health_results %}
+          {{ '%-8s %-10s %s%s' | format(r.state, r.area, r.check, ' (' ~ r.detail ~ ')' if r.detail else '') | to_json }}{{ '' if loop.last else ',' }}
+          {% endfor %}]
+
+    - name: No check failed
+      ansible.builtin.assert:
+        that: health_results | selectattr('state', 'eq', 'FAIL') | list | length == 0
+        fail_msg: >-
+          {{ health_results | selectattr('state', 'eq', 'FAIL') | map(attribute='check') | join(', ') }}
+        quiet: true

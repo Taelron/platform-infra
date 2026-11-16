@@ -13,6 +13,7 @@ is installed, AAP runs the same playbooks as job templates from GitHub.
 | `group_vars/all/`             | every address, port and flow             |
 | `playbooks/site.yml`          | every role, in order                     |
 | `playbooks/<role>.yml`        | one playbook per role                    |
+| `playbooks/health.yml`        | platform health check, read-only         |
 | `roles/`                      | one role per Runbook item, tag = name    |
 | `collections/requirements.yml`| pinned collections                       |
 
@@ -143,3 +144,26 @@ ansible-playbook playbooks/site.yml
 One role only: `ansible-playbook playbooks/base.yml`, or `--tags base`.
 Every change runs with `--check --diff` first; its output goes in the pull
 request. The first real run waits for Gaetan's go.
+
+## Health check
+
+```
+ansible-playbook playbooks/health.yml
+```
+
+Read-only; it changes nothing, also under `--check`. One line per check:
+
+| State    | Means                                          |
+|----------|------------------------------------------------|
+| OK       | works                                          |
+| EXPECTED | route whose service is not built yet           |
+| FAIL     | broken; the playbook fails and names it        |
+
+It checks SELinux, the nftables table, the data volumes, the units in
+`health_units`, BIND, PostgreSQL (TLS, WAL archiving, last pgBackRest
+backup), Garage, the host's certificates, k3s and its deployments, each
+HAProxy backend, and each public name through the load balancer, from the
+machine running the playbook. Routes listed in `health_not_built`
+(`group_vars/all/health.yml`) show EXPECTED while they answer 503; remove a
+name when its service is built, and a check says so once it answers.
+Asking the public names counts as activity for the idle stop.
