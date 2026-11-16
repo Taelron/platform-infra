@@ -60,7 +60,8 @@ consumers from br-mgmt, the clusters from their VM over TLS (self-signed
 until OpenBao issues it). Passwords are in `pass`
 (`taelron/platform/postgresql/<name>`), set when a role is created. WAL is
 archived to S3 with pgBackRest (bucket `platform-pgbackrest-…`, instance role,
-no key); full backup weekly, differential daily, both run after the next boot
+no key), from the moment the stanza exists (before that `archive_command` is
+empty, so a shutdown never waits on a failing push); full backup weekly, differential daily, both run after the next boot
 when the host was stopped. pgBackRest comes from the PGDG repository, limited
 to pgBackRest and its two libraries, signed by PGDG's key (fingerprint in
 `group_vars`).

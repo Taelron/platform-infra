@@ -12,7 +12,12 @@ ssl_min_protocol_version = 'TLSv1.2'
 # Continuous archiving to S3 with pgBackRest.
 wal_level = replica
 archive_mode = on
+{% if postgresql_archive_ready | bool %}
 archive_command = 'pgbackrest --stanza={{ pgbackrest_stanza }} archive-push %p'
+{% else %}
+# Empty until the stanza exists in S3: PostgreSQL keeps its WAL meanwhile.
+archive_command = ''
+{% endif %}
 archive_timeout = 300
 
 log_connections = on

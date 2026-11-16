@@ -26,18 +26,31 @@
     creates: /var/lib/pgsql/data/PG_VERSION
   ignore_errors: "{{ ansible_check_mode }}"
 
+- name: Install pgBackRest
+  ansible.builtin.import_tasks: pgbackrest.yml
+
 - name: Create a TLS certificate for clients in the clusters
   ansible.builtin.import_tasks: tls.yml
 
+# WAL archiving starts only once the stanza exists in S3: an archive_command
+# that fails makes PostgreSQL wait for it on shutdown.
+- name: Check whether the backup stanza exists
+  ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} --output=json info
+  become: true
+  become_user: postgres
+  register: postgresql_stanza_info
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Note whether archiving can start
+  ansible.builtin.set_fact:
+    postgresql_archive_ready: >-
+      {{ postgresql_stanza_info.rc == 0
+         and (postgresql_stanza_info.stdout | from_json)[0].status.code in [0, 2] }}
+
 - name: Write the platform settings
-  ansible.builtin.template:
-    src: taelron.conf.j2
-    dest: /var/lib/pgsql/data/taelron.conf
-    owner: postgres
-    group: postgres
-    mode: "0600"
-  notify: Restart postgresql
-  ignore_errors: "{{ ansible_check_mode }}"
+  ansible.builtin.import_tasks: settings.yml
 
 - name: Include the platform settings
   ansible.builtin.lineinfile:
@@ -56,9 +69,6 @@
   notify: Reload postgresql
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Install pgBackRest
-  ansible.builtin.import_tasks: pgbackrest.yml
-
 - name: Create the PostgreSQL unit drop-in folder
   ansible.builtin.file:
     path: /etc/systemd/system/postgresql.service.d
@@ -75,6 +85,10 @@
       [Unit]
       Wants=network-online.target
       After=network-online.target
+
+      [Service]
+      # Never wait forever on shutdown.
+      TimeoutStopSec=120
     owner: root
     group: root
     mode: "0644"

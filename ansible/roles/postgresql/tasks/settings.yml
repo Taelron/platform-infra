@@ -1,0 +1,12 @@
+---
+- name: Write the platform settings
+  ansible.builtin.template:
+    src: taelron.conf.j2
+    dest: /var/lib/pgsql/data/taelron.conf
+    owner: postgres
+    group: postgres
+    mode: "0600"
+  # A restart also covers archive_mode. When archiving is turned on, the
+  # stanza already exists, so the shutdown is not blocked.
+  notify: Restart postgresql
+  ignore_errors: "{{ ansible_check_mode }}"
