@@ -12,7 +12,13 @@ set -euo pipefail
 state=/var/lib/platform-idle/last-activity
 
 active=no
+# An SSH session open now, or one opened or closed since the previous check:
+# sessions shorter than a minute (Ansible, one-off commands) would otherwise
+# fall between two checks.
 if ss -Htn state established '( sport = :22 )' | grep -q .; then
+  active=ssh
+elif journalctl -u sshd --since "-2 min" -o cat -q 2>/dev/null \
+     | grep -qE 'Accepted publickey|session (opened|closed)'; then
   active=ssh
 fi
 if [ "$active" = no ]; then
