@@ -76,6 +76,16 @@
     group: root
     mode: "0755"
 
+# journald creates this folder only when it flushes, which happens at boot.
+- name: Create the persistent journal folder
+  ansible.builtin.file:
+    path: /var/log/journal
+    state: directory
+    owner: root
+    group: systemd-journal
+    mode: "2755"
+  notify: Restart journald
+
 - name: Keep the journal on disk
   ansible.builtin.copy:
     dest: /etc/systemd/journald.conf.d/10-taelron.conf
