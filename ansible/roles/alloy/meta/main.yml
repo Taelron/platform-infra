@@ -1,0 +1,10 @@
+---
+galaxy_info:
+  author: Taelron
+  description: "Grafana Alloy on the host: host and HAProxy metrics, journal; sends from Phase 5"
+  license: Apache-2.0
+  min_ansible_version: "2.18"
+  platforms:
+    - name: EL
+      versions: ["9"]
+dependencies: []

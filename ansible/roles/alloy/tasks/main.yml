@@ -1,0 +1,68 @@
+---
+- name: Copy Grafana's RPM signing key
+  ansible.builtin.copy:
+    src: grafana-rpm.key
+    dest: /etc/pki/rpm-gpg/RPM-GPG-KEY-grafana
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install Grafana's signing key, checked against its fingerprint
+  ansible.builtin.rpm_key:
+    key: /etc/pki/rpm-gpg/RPM-GPG-KEY-grafana
+    fingerprint: "{{ grafana_rpm_key_fingerprint }}"
+    state: present
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Each package's signature is checked. The repository metadata's signature
+# does not verify with this key on RHEL 9 (measured), so repo_gpgcheck is off.
+- name: Add Grafana's RPM repository, limited to Alloy
+  ansible.builtin.yum_repository:
+    name: grafana
+    description: Grafana Labs RPMs (Alloy only)
+    baseurl: https://rpm.grafana.com
+    gpgcheck: true
+    repo_gpgcheck: false
+    gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-grafana
+    includepkgs: [alloy]
+    enabled: true
+
+- name: Install Alloy {{ alloy_version }}
+  ansible.builtin.dnf:
+    name: "alloy-{{ alloy_version }}"
+    state: present
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Keep Alloy's UI on the loopback
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/alloy
+    regexp: "^CUSTOM_ARGS="
+    line: CUSTOM_ARGS="--server.http.listen-addr=127.0.0.1:12345 --disable-reporting"
+  notify: Restart alloy
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Write the Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: /etc/alloy/config.alloy
+    owner: root
+    group: alloy
+    mode: "0640"
+    validate: alloy fmt %s
+  notify: Restart alloy
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Let Alloy read the journal
+  ansible.builtin.user:
+    name: alloy
+    groups: [systemd-journal]
+    append: true
+  notify: Restart alloy
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Run Alloy
+  ansible.builtin.systemd_service:
+    name: alloy
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"

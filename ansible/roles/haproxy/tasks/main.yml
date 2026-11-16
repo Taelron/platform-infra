@@ -1,0 +1,64 @@
+---
+- name: Install HAProxy
+  ansible.builtin.dnf:
+    name: haproxy
+    state: present
+
+# AAP's port 9443 has no SELinux type; labelled as an HTTP port so that
+# HAProxy may connect to it, rather than turning on haproxy_connect_any.
+- name: Label AAP's port for HAProxy
+  community.general.seport:
+    ports: "9443"
+    proto: tcp
+    setype: http_port_t
+    state: present
+
+- name: Create the certificate folder
+  ansible.builtin.file:
+    path: /etc/haproxy/certs
+    state: directory
+    owner: root
+    group: haproxy
+    mode: "0750"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# The load balancer does not check the target's certificate; ACM ends TLS for
+# the clients.
+- name: Create HAProxy's self-signed certificate
+  ansible.builtin.shell: >-
+    set -o pipefail &&
+    openssl req -x509 -newkey rsa:3072 -nodes -days 3650
+    -subj /CN={{ inventory_hostname }}
+    -addext subjectAltName=IP:{{ host_vpc_address }}
+    -keyout /dev/stdout -out /dev/stdout 2>/dev/null
+    | install -m 0640 -g haproxy /dev/stdin /etc/haproxy/certs/host.pem
+  args:
+    creates: /etc/haproxy/certs/host.pem
+    executable: /bin/bash
+  notify: Reload haproxy
+
+- name: Write the HAProxy configuration
+  ansible.builtin.template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: "0644"
+    validate: haproxy -c -f %s
+  notify: Reload haproxy
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Run HAProxy
+  ansible.builtin.systemd_service:
+    name: haproxy
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Count requests through the load balancer as activity for the idle stop
+  ansible.builtin.copy:
+    src: haproxy-activity
+    dest: /etc/platform-idle/activity.d/haproxy
+    owner: root
+    group: root
+    mode: "0755"

@@ -1,0 +1,11 @@
+# Grafana Alloy on the host (Platform Design Decisions 20).
+alloy_version: 1.21.3
+# Grafana's RPM signing key, in the role, checked against this fingerprint.
+grafana_rpm_key_fingerprint: B53AE77BADB630A683046005963FA27710458545
+
+# Mimir and Loki run in shared from Phase 5, behind the internal gateway
+# {{ clusters.shared.internal_gateway }}. Until then Alloy collects but sends
+# nothing.
+alloy_remote_enabled: false
+alloy_mimir_url: ""
+alloy_loki_url: ""

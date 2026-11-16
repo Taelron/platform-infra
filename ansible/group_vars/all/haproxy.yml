@@ -1,0 +1,30 @@
+# HAProxy on the host (Platform Design Decisions 10, 17; Where services listen).
+# The load balancer ends TLS with the ACM certificates and re-encrypts to
+# HAProxy on {{ host_vpc_address }}:443 without checking HAProxy's
+# certificate, so HAProxy has a self-signed one. Each public name is routed
+# by its Host header.
+haproxy_routes:
+  - name: rancher
+    hosts: [rancher.mgmt.taelron.com]
+    server: 127.0.0.1:8443
+  # AAP before the *.shared rule (decision 17).
+  - name: aap
+    hosts: [aap.shared.taelron.com]
+    server: "{{ aap_address }}:9443"
+  - name: shared
+    domain: .shared.taelron.com
+    server: "{{ clusters.shared.public_gateway }}:443"
+  - name: test
+    domain: .test.taelron.com
+    server: "{{ clusters.test.public_gateway }}:443"
+  - name: demo
+    domain: .demo.taelron.com
+    server: "{{ clusters.demo.public_gateway }}:443"
+
+# Rancher agents in the clusters reach Rancher on {{ rancher_address }}:443;
+# passed through over TCP to the k3s ingress, so they see Rancher's own
+# certificate.
+haproxy_rancher_agents_backend: 127.0.0.1:8443
+
+# Metrics for Alloy, on the loopback only.
+haproxy_metrics_bind: 127.0.0.1:8405

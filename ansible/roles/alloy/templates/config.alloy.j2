@@ -1,0 +1,45 @@
+// {{ ansible_managed }}
+// Grafana Alloy on platform-aws-01 (Platform Design Decisions 20).
+{% if not alloy_remote_enabled %}
+// Mimir and Loki do not exist yet (Phase 5): the host's metrics are collected
+// and visible in Alloy's own UI on 127.0.0.1:12345, and nothing is sent.
+{% endif %}
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+prometheus.exporter.unix "host" { }
+
+{% if alloy_remote_enabled %}
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+  scrape_interval = "60s"
+}
+
+prometheus.scrape "haproxy" {
+  targets         = [{"__address__" = "{{ haproxy_metrics_bind }}", "job" = "haproxy"}]
+  forward_to      = [prometheus.remote_write.mimir.receiver]
+  scrape_interval = "60s"
+}
+
+prometheus.remote_write "mimir" {
+  external_labels = {"host" = "{{ inventory_hostname }}"}
+  endpoint {
+    url = "{{ alloy_mimir_url }}"
+  }
+}
+
+loki.source.journal "host" {
+  forward_to = [loki.write.loki.receiver]
+  labels     = {"host" = "{{ inventory_hostname }}"}
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "{{ alloy_loki_url }}"
+  }
+}
+{% endif %}

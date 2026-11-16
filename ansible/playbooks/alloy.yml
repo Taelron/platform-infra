@@ -1,0 +1,6 @@
+---
+- name: Alloy
+  hosts: host
+  roles:
+    - role: alloy
+      tags: [alloy]

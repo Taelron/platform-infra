@@ -29,6 +29,8 @@ inventory.
 | `bind`    | internal zone `int.taelron.com`, forwarder           |
 | `postgresql` | PostgreSQL 15, one database per consumer, pgBackRest |
 | `garage`  | S3 object storage for Mimir, Loki, Tempo             |
+| `haproxy` | public names, Rancher agents, health check           |
+| `alloy`   | host metrics and logs (sends from Phase 5)           |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -75,6 +77,21 @@ type `container_file_t`. The admin API listens on `127.0.0.1:3903` only; the
 role sets up the layout, one bucket and one key per consumer (read and write
 on its own bucket only) through it, so no secret appears on a command line.
 Secrets and keys are in `pass` (`taelron/platform/garage/…`).
+
+`haproxy`: HAProxy on `10.20.1.10:443` for the load balancer, which ends TLS
+with ACM and re-encrypts to HAProxy's self-signed certificate. Each public name
+goes by its Host header to Rancher, AAP or a cluster's public gateway `.200`
+(`haproxy_routes`); AAP comes before the `*.shared` rule. The load balancer's
+health check, which asks for the host's own address, is answered by HAProxy
+itself. Rancher agents reach `192.168.10.13:443`, passed through over TCP to
+the k3s ingress. Metrics on `127.0.0.1:8405`. It adds the idle stop's HTTPS
+check: a request through the load balancer in the last two minutes, other
+than a health check, counts as activity; Rancher agents do not.
+
+`alloy`: Grafana Alloy, pinned, from Grafana's RPM repository (limited to
+Alloy; each package's signature checked against the pinned key). Until
+Mimir and Loki exist in shared (Phase 5), `alloy_remote_enabled` is false and
+Alloy sends nothing; its UI stays on `127.0.0.1:12345`.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

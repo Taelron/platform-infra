@@ -1,0 +1,7 @@
+#!/bin/sh
+# Idle stop (role base): exits 0 if a request came through the load balancer
+# in the last two minutes, other than its health checks. Requests from the
+# Rancher agents do not count: they keep connections open all the time.
+journalctl -u haproxy --since "-2 min" -o cat -q 2>/dev/null \
+  | grep ' fe_public~ ' \
+  | grep -qv ' be_health/'
