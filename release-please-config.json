@@ -17,8 +17,7 @@
       ]
     },
     "tofu/platform": {
-      "component": "foundation",
-      "release-as": "1.0.0"
+      "component": "foundation"
     }
   }
 }
