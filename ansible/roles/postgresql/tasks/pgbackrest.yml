@@ -38,3 +38,28 @@
     group: postgres
     mode: "0640"
   ignore_errors: "{{ ansible_check_mode }}"
+
+# SELinux stays enforcing; this module allows only the one connection
+# pgBackRest needs when PostgreSQL runs it.
+- name: Copy the SELinux rule for pgBackRest
+  ansible.builtin.copy:
+    src: taelron_pgbackrest.cil
+    dest: /etc/selinux/taelron_pgbackrest.cil
+    owner: root
+    group: root
+    mode: "0644"
+  register: postgresql_selinux_rule
+
+- name: Read the loaded SELinux modules
+  ansible.builtin.command: semodule -l
+  register: postgresql_selinux_modules
+  changed_when: false
+  check_mode: false
+
+- name: Load the SELinux rule for pgBackRest
+  ansible.builtin.command: semodule -i /etc/selinux/taelron_pgbackrest.cil
+  when: >-
+    postgresql_selinux_rule is changed
+    or 'taelron_pgbackrest' not in postgresql_selinux_modules.stdout_lines
+  changed_when: true
+  ignore_errors: "{{ ansible_check_mode }}"
