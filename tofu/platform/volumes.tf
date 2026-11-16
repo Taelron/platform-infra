@@ -29,11 +29,8 @@ resource "aws_ebs_volume" "data" {
     Backup = "daily"
   })
 
-  # Off for one pull request only, to delete the cluster volumes created too
-  # early (shared, test, demo; empty, never snapshotted). The next pull
-  # request turns it back on.
   lifecycle {
-    prevent_destroy = false
+    prevent_destroy = true
   }
 }
 
