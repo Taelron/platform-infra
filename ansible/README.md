@@ -32,6 +32,7 @@ inventory.
 | `haproxy` | public names, Rancher agents, health check           |
 | `alloy`   | host metrics and logs (sends from Phase 5)           |
 | `kvm`     | KVM and libvirt, no NAT network                      |
+| `k3s_rancher` | mgmt cluster: k3s, Traefik, Rancher Manager       |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -96,6 +97,17 @@ Alloy sends nothing; its UI stays on `127.0.0.1:12345`.
 
 `kvm`: KVM and libvirt (modular daemons, started by their sockets). libvirt's
 default NAT network is removed: the cluster VMs use the four bridges only.
+
+`k3s_rancher`: the mgmt cluster. k3s (pinned binary, checksum) on its
+PostgreSQL database, data on the k3s volume, SELinux enforcing with
+`k3s-selinux` (Rancher's RPM repository, limited to it, package signatures
+checked), secrets encryption on, no bundled load balancer. Traefik runs on
+the host network on `127.0.0.1:8443` only; HAProxy sends Rancher's name and
+the Rancher agents there. cert-manager and Rancher Manager are Helm charts
+that k3s applies from `/var/lib/rancher/k3s/server/manifests`. Rancher has its
+own certificate authority. The k3s token, the database password and Rancher's
+first admin password (break-glass) are in `pass`; on the host they are in
+root-only files (`/etc/rancher/k3s/config.yaml`, the Rancher manifest).
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

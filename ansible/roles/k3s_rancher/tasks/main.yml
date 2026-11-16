@@ -1,0 +1,86 @@
+---
+- name: Read the k3s and Rancher secrets from pass
+  ansible.builtin.set_fact:
+    k3s_rancher_db_password: >-
+      {{ k3s_rancher_db_password | default(lookup('community.general.passwordstore', 'taelron/platform/postgresql/k3s')) }}
+    k3s_rancher_token: >-
+      {{ k3s_rancher_token | default(lookup('community.general.passwordstore', 'taelron/platform/k3s/token')) }}
+    k3s_rancher_admin_password: >-
+      {{ k3s_rancher_admin_password | default(lookup('community.general.passwordstore', 'taelron/platform/rancher/admin-password')) }}
+  no_log: true
+
+- name: Install k3s's SELinux policy
+  ansible.builtin.import_tasks: selinux.yml
+
+- name: Download k3s {{ k3s_version }}
+  ansible.builtin.get_url:
+    url: "https://github.com/k3s-io/k3s/releases/download/{{ k3s_version | urlencode }}/k3s"
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ k3s_sha256 }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify:
+    - Label the k3s binary
+    - Restart k3s
+
+- name: Create the k3s folders
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/rancher/k3s
+    - /var/lib/rancher/k3s/server/manifests
+
+- name: Write the k3s configuration
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart k3s
+
+- name: Install the k3s unit
+  ansible.builtin.template:
+    src: k3s.service.j2
+    dest: /etc/systemd/system/k3s.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart k3s
+
+# k3s applies every file in this folder: Traefik's settings, cert-manager and
+# Rancher, as Helm charts.
+- name: Write the cluster's charts
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/var/lib/rancher/k3s/server/manifests/{{ item }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - traefik-config.yaml
+    - cert-manager.yaml
+    - rancher.yaml
+  no_log: true
+
+- name: Flush handlers so k3s starts with its configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Run k3s
+  ansible.builtin.systemd_service:
+    name: k3s
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Wait for Rancher
+  ansible.builtin.import_tasks: wait.yml
+  when: not ansible_check_mode

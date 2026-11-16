@@ -1,0 +1,6 @@
+---
+- name: K3s and Rancher
+  hosts: host
+  roles:
+    - role: k3s_rancher
+      tags: [k3s_rancher]

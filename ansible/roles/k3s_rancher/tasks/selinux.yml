@@ -1,0 +1,42 @@
+---
+- name: Copy Rancher's RPM signing key
+  ansible.builtin.copy:
+    src: rancher-rpm.key
+    dest: /etc/pki/rpm-gpg/RPM-GPG-KEY-rancher
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install Rancher's signing key, checked against its fingerprint
+  ansible.builtin.rpm_key:
+    key: /etc/pki/rpm-gpg/RPM-GPG-KEY-rancher
+    fingerprint: "{{ rancher_rpm_key_fingerprint }}"
+    state: present
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Each package's signature is checked. The repository publishes no metadata
+# signature (repomd.xml.asc: 404, measured), so repo_gpgcheck is off.
+- name: Add Rancher's RPM repository, limited to k3s-selinux
+  ansible.builtin.yum_repository:
+    name: rancher-k3s-common
+    description: Rancher k3s common RPMs for EL 9 (k3s-selinux only)
+    baseurl: https://rpm.rancher.io/k3s/stable/common/centos/9/noarch
+    gpgcheck: true
+    repo_gpgcheck: false
+    gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rancher
+    includepkgs: [k3s-selinux]
+    enabled: true
+
+- name: Install k3s's SELinux policy {{ k3s_selinux_version }}
+  ansible.builtin.dnf:
+    name: ["container-selinux", "k3s-selinux-{{ k3s_selinux_version }}"]
+    state: present
+  register: k3s_rancher_selinux_package
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# The k3s volume was labelled before this policy existed; relabel it so that
+# k3s's containerd finds its own types under /var/lib/rancher.
+- name: Relabel the k3s volume with the new policy
+  ansible.builtin.command: restorecon -R /var/lib/rancher
+  when: k3s_rancher_selinux_package is changed and not ansible_check_mode
+  changed_when: true

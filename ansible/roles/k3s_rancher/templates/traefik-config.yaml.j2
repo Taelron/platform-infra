@@ -1,0 +1,27 @@
+# {{ ansible_managed }}
+# Traefik, k3s's bundled ingress, on the host network and the loopback only:
+# HAProxy forwards Rancher's name to {{ k3s_ingress_bind }}:{{ k3s_ingress_https_port }}.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    hostNetwork: true
+    service:
+      enabled: false
+    providers:
+      kubernetesIngress:
+        publishedService:
+          enabled: false
+    ports:
+      web:
+        port: {{ k3s_ingress_http_port }}
+      websecure:
+        port: {{ k3s_ingress_https_port }}
+    additionalArguments:
+      - "--entryPoints.web.address={{ k3s_ingress_bind }}:{{ k3s_ingress_http_port }}/tcp"
+      - "--entryPoints.websecure.address={{ k3s_ingress_bind }}:{{ k3s_ingress_https_port }}/tcp"
+    updateStrategy:
+      type: Recreate

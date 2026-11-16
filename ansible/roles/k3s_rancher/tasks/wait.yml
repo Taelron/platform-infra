@@ -1,0 +1,20 @@
+---
+- name: Wait for the node to be ready
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl wait node --all --for=condition=Ready --timeout=10s
+  register: k3s_rancher_node
+  until: k3s_rancher_node.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+
+# The charts are installed by k3s's Helm controller; pulling the images takes
+# a few minutes on the first run.
+- name: Wait for Rancher to be rolled out
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl -n cattle-system rollout status deployment/rancher --timeout=10s
+  register: k3s_rancher_rollout
+  until: k3s_rancher_rollout.rc == 0
+  retries: 60
+  delay: 15
+  changed_when: false

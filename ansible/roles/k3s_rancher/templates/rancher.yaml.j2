@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# Rancher Manager {{ rancher_version }} on the mgmt cluster. Its certificate
+# comes from its own authority (through cert-manager); Rancher agents receive
+# the authority's checksum when they register. The first admin password is
+# the break-glass account (Platform Design Decisions 5).
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: rancher
+  namespace: kube-system
+spec:
+  repo: https://releases.rancher.com/server-charts/stable
+  chart: rancher
+  version: {{ rancher_version }}
+  targetNamespace: cattle-system
+  createNamespace: true
+  valuesContent: |-
+    hostname: {{ rancher_hostname }}
+    replicas: 1
+    bootstrapPassword: "{{ k3s_rancher_admin_password }}"
+    ingress:
+      ingressClassName: traefik
+      tls:
+        source: rancher
