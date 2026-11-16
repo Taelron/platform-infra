@@ -1,0 +1,5 @@
+; pgBackRest runs as PostgreSQL's archive_command, in the domain postgresql_t,
+; and pushes WAL to S3 over HTTPS (443) with credentials from the instance
+; metadata service (80). Both ports are http_port_t. Measured on 16 November
+; 2026: without this rule SELinux denies name_connect and archiving stops.
+(allow postgresql_t http_port_t (tcp_socket (name_connect)))
