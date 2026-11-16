@@ -18,3 +18,18 @@
   retries: 60
   delay: 15
   changed_when: false
+
+# Rancher fills server-url on the first sign-in in a browser; the agents of
+# the clusters (Phase 5) need it, so it is set here.
+- name: Read Rancher's server URL
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl get settings.management.cattle.io server-url -o jsonpath={.value}
+  register: k3s_rancher_server_url
+  changed_when: false
+
+- name: Set Rancher's server URL
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl patch settings.management.cattle.io server-url --type=merge
+    -p '{"value": "https://{{ rancher_hostname }}"}'
+  when: k3s_rancher_server_url.stdout != 'https://' ~ rancher_hostname
+  changed_when: true
