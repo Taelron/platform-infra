@@ -96,9 +96,11 @@ Alloy sends nothing; its UI stays on `127.0.0.1:12345`.
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no
 root; applies security updates daily with `dnf-automatic` (no automatic
-reboot); installs the pinned Amazon SSM Agent for Session Manager; and installs
+reboot); keeps the journal on disk (at most 1 GB); installs the pinned Amazon SSM
+Agent for Session Manager; and installs
 the idle stop. The idle stop powers the host off after `idle_stop_minutes`
-(60) with no SSH session and no HTTPS activity; programs in
+(60) with no SSH session (open now, or opened or closed in the last two
+minutes) and no HTTPS activity; programs in
 `/etc/platform-idle/activity.d/` report other activity (HAProxy adds one).
 Set `idle_stop_enabled: false` for the dates of a client trial.
 

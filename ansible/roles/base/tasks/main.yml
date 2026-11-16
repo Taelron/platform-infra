@@ -66,6 +66,28 @@
   # In check mode dnf-automatic is not installed yet.
   ignore_errors: "{{ ansible_check_mode }}"
 
+# Keep the journal across stops and reboots (the host stops every night), at
+# most 1 GB.
+- name: Create the journald drop-in folder
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Keep the journal on disk
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/10-taelron.conf
+    content: |
+      [Journal]
+      Storage=persistent
+      SystemMaxUse=1G
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart journald
+
 - name: Install the Amazon SSM Agent
   ansible.builtin.import_tasks: ssm.yml
 
