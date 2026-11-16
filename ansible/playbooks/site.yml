@@ -8,3 +8,6 @@
 
 - name: Network
   ansible.builtin.import_playbook: network.yml
+
+- name: BIND
+  ansible.builtin.import_playbook: bind.yml

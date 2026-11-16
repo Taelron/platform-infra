@@ -26,6 +26,7 @@ inventory.
 | `base` | SELinux, SSH by key, firewalld off, updates, idle stop  |
 | `disks`   | data volumes by EBS ID, XFS, mounted                 |
 | `network` | bridges, host addresses, forwarding, nftables        |
+| `bind`    | internal zone `int.taelron.com`, forwarder           |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -41,6 +42,14 @@ forwarding; the stock `nftables.service` is masked, because it flushes the
 whole ruleset on reload and stop.
 Loading a new ruleset arms a 120-second rollback that is cancelled only once a
 new SSH connection gets through.
+
+`bind`: BIND 9.18 on each bridge's `.1` and `127.0.0.1`, never on `eth0`. It
+holds `int.taelron.com`; each cluster's ExternalDNS updates only names under
+`<cluster>.int.taelron.com`, with its own TSIG key. The keys are in `pass`
+(`taelron/platform/bind/<cluster>`) and read at run time; AAP passes
+`bind_update_keys` from its credentials. The zone file is written once only,
+since named keeps the records ExternalDNS adds. Every other name is forwarded
+to the AWS resolver; `rancher.mgmt.taelron.com` answers Rancher's host address.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

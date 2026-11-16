@@ -1,0 +1,12 @@
+# BIND on the host (Platform Design Decisions 13).
+dns_internal_zone: int.taelron.com
+
+# Each cluster's ExternalDNS updates only names under <cluster>.int.taelron.com,
+# with its own TSIG key. The keys are read at run time: from pass on the RHEL
+# box (taelron/platform/bind/<cluster>), from AAP credentials later.
+dns_update_clusters: [shared, test, demo]
+
+# Inside the platform, Rancher's public name resolves to its host address.
+dns_local_overrides:
+  - name: rancher.mgmt.taelron.com
+    address: "{{ rancher_address }}"
