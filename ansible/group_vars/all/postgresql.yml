@@ -1,0 +1,34 @@
+# PostgreSQL on the host (Platform Design Decisions 7, Where services listen).
+postgresql_stream: "15"
+
+# One database and one role of the same name per consumer, each reachable
+# only from where that consumer runs. Host consumers (k3s, AAP) connect from
+# a host address on br-mgmt; the clusters from their VM, over TLS. Passwords
+# are read at run time: pass taelron/platform/postgresql/<name> on the RHEL
+# box, AAP credentials later.
+postgresql_host_sources: ["{{ bridges[0].prefix }}.0/24"]
+postgresql_databases:
+  - { name: k3s, from: "{{ postgresql_host_sources }}" }
+  - { name: rke2_shared, from: ["{{ clusters.shared.vm }}/32"] }
+  - { name: rke2_test, from: ["{{ clusters.test.vm }}/32"] }
+  - { name: rke2_demo, from: ["{{ clusters.demo.vm }}/32"] }
+  - { name: aap_gateway, from: "{{ postgresql_host_sources }}" }
+  - { name: aap_controller, from: "{{ postgresql_host_sources }}" }
+  - { name: aap_hub, from: "{{ postgresql_host_sources }}", extensions: [hstore] }
+  - { name: aap_eda, from: "{{ postgresql_host_sources }}" }
+  - { name: keycloak_platform, from: ["{{ clusters.shared.vm }}/32"] }
+  - { name: keycloak_test, from: ["{{ clusters.test.vm }}/32"] }
+  - { name: keycloak_demo, from: ["{{ clusters.demo.vm }}/32"] }
+  - { name: grafana, from: ["{{ clusters.shared.vm }}/32"] }
+  - { name: fleetdesk_test, from: ["{{ clusters.test.vm }}/32"] }
+  - { name: fleetdesk_demo, from: ["{{ clusters.demo.vm }}/32"] }
+
+# pgBackRest to S3 with the instance role's credentials (no key).
+pgbackrest_version: 2.60.0
+pgbackrest_bucket: platform-pgbackrest-181841605684
+pgbackrest_region: eu-central-1
+pgbackrest_stanza: platform
+pgbackrest_retention_full: 2
+# PGDG signs pgBackRest; its key is in the role, checked against this
+# fingerprint. Only pgBackRest and its two libraries come from PGDG.
+pgdg_key_fingerprint: D4BF08AE67A0B4C7A1DBCCD240BCA2B408B40D20

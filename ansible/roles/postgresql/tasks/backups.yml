@@ -1,0 +1,57 @@
+---
+- name: Create the backup stanza in S3
+  ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} stanza-create
+  become: true
+  become_user: postgres
+  register: postgresql_stanza
+  changed_when: "'already exists' not in postgresql_stanza.stdout ~ postgresql_stanza.stderr"
+  when: not ansible_check_mode
+
+- name: Check that WAL archiving reaches S3
+  ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} check
+  become: true
+  become_user: postgres
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Read the backups in S3
+  ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} --output=json info
+  become: true
+  become_user: postgres
+  register: postgresql_backup_info
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Take the first full backup
+  ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} --type=full backup
+  become: true
+  become_user: postgres
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - (postgresql_backup_info.stdout | from_json)[0].backup | length == 0
+
+- name: Install the backup units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - pgbackrest-full.service
+    - pgbackrest-full.timer
+    - pgbackrest-diff.service
+    - pgbackrest-diff.timer
+  notify: Reload systemd
+
+- name: Flush handlers so systemd knows the units
+  ansible.builtin.meta: flush_handlers
+
+- name: Run the backups on schedule
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop: [pgbackrest-full.timer, pgbackrest-diff.timer]
+  ignore_errors: "{{ ansible_check_mode }}"

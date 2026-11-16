@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+# Platform settings, included from postgresql.conf.
+
+listen_addresses = '127.0.0.1,{{ postgresql_address }}'
+password_encryption = scram-sha-256
+
+ssl = on
+ssl_cert_file = 'server.crt'
+ssl_key_file = 'server.key'
+ssl_min_protocol_version = 'TLSv1.2'
+
+# Continuous archiving to S3 with pgBackRest.
+wal_level = replica
+archive_mode = on
+archive_command = 'pgbackrest --stanza={{ pgbackrest_stanza }} archive-push %p'
+archive_timeout = 300
+
+log_connections = on
+log_disconnections = on

@@ -1,0 +1,11 @@
+# Daily. A missed run starts after the next boot (Persistent).
+[Unit]
+Description=Daily pgBackRest differential backup
+
+[Timer]
+OnCalendar=*-*-* 12:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target
