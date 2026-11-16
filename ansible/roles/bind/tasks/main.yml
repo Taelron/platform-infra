@@ -1,0 +1,79 @@
+---
+- name: Read the update keys from pass
+  ansible.builtin.set_fact:
+    bind_update_keys: >-
+      {{ (bind_update_keys | default({}))
+         | combine({item: lookup('community.general.passwordstore', 'taelron/platform/bind/' ~ item)}) }}
+  loop: "{{ dns_update_clusters }}"
+  when: bind_update_keys is not defined or item not in bind_update_keys
+  no_log: true
+
+- name: Install BIND
+  ansible.builtin.dnf:
+    name: ["{{ bind_package }}", "{{ bind_package }}-utils"]
+    state: present
+
+- name: Create the key folder
+  ansible.builtin.file:
+    path: /etc/named/keys
+    state: directory
+    owner: root
+    group: named
+    mode: "0750"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Write one update key per cluster
+  ansible.builtin.template:
+    src: update-key.conf.j2
+    dest: /etc/named/keys/{{ item }}.conf
+    owner: root
+    group: named
+    mode: "0640"
+  loop: "{{ dns_update_clusters }}"
+  no_log: true
+  notify: Reload named
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Write the zone of each local override
+  ansible.builtin.template:
+    src: override.zone.j2
+    dest: /var/named/{{ item.name }}.zone
+    owner: root
+    group: named
+    mode: "0640"
+  loop: "{{ dns_local_overrides }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Reload named
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# Written once only: ExternalDNS then adds its records by dynamic update, and
+# named keeps them in this file.
+- name: Create the internal zone if it does not exist
+  ansible.builtin.template:
+    src: internal.zone.j2
+    dest: /var/named/dynamic/{{ dns_internal_zone }}.zone
+    owner: named
+    group: named
+    mode: "0640"
+    force: false
+  notify: Reload named
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Write the BIND configuration
+  ansible.builtin.template:
+    src: named.conf.j2
+    dest: /etc/named.conf
+    owner: root
+    group: named
+    mode: "0640"
+    validate: /usr/sbin/named-checkconf %s
+  notify: Reload named
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Run BIND
+  ansible.builtin.systemd_service:
+    name: named
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"

@@ -1,0 +1,5 @@
+// {{ ansible_managed }}
+key "{{ item }}-update" {
+  algorithm hmac-sha256;
+  secret "{{ bind_update_keys[item] }}";
+};

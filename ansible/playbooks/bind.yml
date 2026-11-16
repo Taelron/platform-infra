@@ -1,0 +1,6 @@
+---
+- name: BIND
+  hosts: host
+  roles:
+    - role: bind
+      tags: [bind]

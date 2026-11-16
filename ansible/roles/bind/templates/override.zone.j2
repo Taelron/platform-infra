@@ -1,0 +1,7 @@
+; {{ ansible_managed }}
+; Inside the platform, {{ item.name }} answers {{ item.address }}.
+$TTL 300
+@   IN SOA ns.{{ dns_internal_zone }}. hostmaster.{{ dns_internal_zone }}. (
+        1 3600 600 86400 300 )
+    IN NS  ns.{{ dns_internal_zone }}.
+    IN A   {{ item.address }}

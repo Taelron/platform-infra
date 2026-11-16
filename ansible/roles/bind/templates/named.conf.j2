@@ -1,0 +1,69 @@
+// {{ ansible_managed }}
+// BIND on platform-aws-01 (Platform Design Decisions 13): the internal zone
+// {{ dns_internal_zone }}, on each bridge's .1 and on 127.0.0.1 only, never on
+// the VPC interface; every other name is forwarded to the AWS resolver.
+
+acl platform {
+  127.0.0.0/8;
+{% for b in bridges %}
+  {{ b.prefix }}.0/24;
+{% endfor %}
+};
+
+options {
+  directory "/var/named";
+  dump-file "/var/named/data/cache_dump.db";
+  statistics-file "/var/named/data/named_stats.txt";
+  pid-file "/run/named/named.pid";
+  session-keyfile "/run/named/session.key";
+
+  listen-on port 53 {
+    127.0.0.1;
+{% for b in bridges %}
+    {{ b.prefix }}.1;
+{% endfor %}
+  };
+  listen-on-v6 { none; };
+
+  allow-query { platform; };
+  recursion yes;
+  allow-recursion { platform; };
+  allow-transfer { none; };
+
+  forwarders { {{ aws_resolver }}; };
+  forward only;
+  dnssec-validation auto;
+
+  version none;
+};
+
+logging {
+  channel default_log {
+    syslog daemon;
+    severity info;
+  };
+  category default { default_log; };
+};
+
+{% for c in dns_update_clusters %}
+include "/etc/named/keys/{{ c }}.conf";
+{% endfor %}
+
+zone "{{ dns_internal_zone }}" IN {
+  type primary;
+  file "dynamic/{{ dns_internal_zone }}.zone";
+  update-policy {
+{% for c in dns_update_clusters %}
+    grant {{ c }}-update subdomain {{ c }}.{{ dns_internal_zone }}. ANY;
+{% endfor %}
+  };
+};
+
+{% for o in dns_local_overrides %}
+zone "{{ o.name }}" IN {
+  type primary;
+  file "{{ o.name }}.zone";
+};
+
+{% endfor %}
+include "/etc/named.root.key";
