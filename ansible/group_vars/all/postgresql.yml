@@ -16,12 +16,26 @@ postgresql_databases:
   - { name: aap_controller, from: "{{ postgresql_host_sources }}" }
   - { name: aap_hub, from: "{{ postgresql_host_sources }}", extensions: [hstore] }
   - { name: aap_eda, from: "{{ postgresql_host_sources }}" }
+  - { name: aap_metrics, from: "{{ postgresql_host_sources }}" }
   - { name: keycloak_platform, from: ["{{ clusters.shared.vm }}/32"] }
   - { name: keycloak_test, from: ["{{ clusters.test.vm }}/32"] }
   - { name: keycloak_demo, from: ["{{ clusters.demo.vm }}/32"] }
   - { name: grafana, from: ["{{ clusters.shared.vm }}/32"] }
   - { name: fleetdesk_test, from: ["{{ clusters.test.vm }}/32"] }
   - { name: fleetdesk_demo, from: ["{{ clusters.demo.vm }}/32"] }
+
+# Roles that own no database and only connect to another consumer's: AAP 2.7's
+# metrics service reads the controller's tables, and EDA's event streams use
+# their own role. Passwords in pass under the same path as the databases'.
+postgresql_reader_roles:
+  - name: ms_awx_readonly
+    database: aap_controller
+    read_tables: true
+    from: "{{ postgresql_host_sources }}"
+  - name: eda_event_stream
+    database: aap_eda
+    read_tables: false
+    from: "{{ postgresql_host_sources }}"
 
 # pgBackRest to S3 with the instance role's credentials (no key).
 pgbackrest_version: 2.60.0

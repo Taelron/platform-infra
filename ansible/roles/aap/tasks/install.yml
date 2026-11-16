@@ -1,0 +1,50 @@
+---
+# The installer needs passwordless sudo, only while it runs: the containers
+# run as {{ aap_user }}, so a container escape must not become root.
+- name: Run AAP's installer, with sudo for the run only
+  block:
+    - name: Give sudo for the install to {{ aap_user }}
+      ansible.builtin.copy:
+        content: "{{ aap_user }} ALL=(ALL) NOPASSWD: ALL\n"
+        dest: /etc/sudoers.d/aap-install
+        owner: root
+        group: root
+        mode: "0440"
+        validate: visudo -cf %s
+
+    - name: Read the uid of {{ aap_user }}
+      ansible.builtin.command: id -u {{ aap_user }}
+      register: aap_uid
+      changed_when: false
+      check_mode: false
+
+    # Takes 20 to 40 minutes the first time.
+    - name: Run the installer
+      ansible.builtin.command:
+        cmd: ansible-playbook -i inventory-taelron.yml ansible.containerized_installer.install
+        chdir: "{{ aap_installer_dir }}"
+      become: true
+      become_user: "{{ aap_user }}"
+      environment:
+        XDG_RUNTIME_DIR: /run/user/{{ aap_uid.stdout }}
+        DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/{{ aap_uid.stdout }}/bus
+      async: 5400
+      poll: 30
+      register: aap_install
+      changed_when: true
+
+  always:
+    - name: Take sudo back from {{ aap_user }}
+      ansible.builtin.file:
+        path: /etc/sudoers.d/aap-install
+        state: absent
+
+- name: Wait for the gateway
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:{{ aap_ports.envoy_https_port }}/api/gateway/v1/ping/"
+    validate_certs: false
+  register: aap_ping_after
+  until: aap_ping_after.status == 200
+  retries: 30
+  delay: 10
+  when: not ansible_check_mode

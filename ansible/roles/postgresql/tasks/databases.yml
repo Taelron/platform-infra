@@ -50,3 +50,70 @@
   loop: "{{ postgresql_databases | subelements('extensions', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }}: {{ item.1 }}"
+
+- name: Create the reader roles
+  community.postgresql.postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ postgresql_passwords[item.name] }}"
+    role_attr_flags: LOGIN,NOSUPERUSER,NOCREATEDB,NOCREATEROLE
+    no_password_changes: true
+  become: true
+  become_user: postgres
+  loop: "{{ postgresql_reader_roles }}"
+  no_log: true
+
+- name: Let each reader role connect to its database
+  community.postgresql.postgresql_privs:
+    login_db: "{{ item.database }}"
+    type: database
+    objs: "{{ item.database }}"
+    roles: "{{ item.name }}"
+    privs: CONNECT
+  become: true
+  become_user: postgres
+  loop: "{{ postgresql_reader_roles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Let the table readers use the public schema
+  community.postgresql.postgresql_privs:
+    login_db: "{{ item.database }}"
+    type: schema
+    objs: public
+    roles: "{{ item.name }}"
+    privs: USAGE
+  become: true
+  become_user: postgres
+  loop: "{{ postgresql_reader_roles | selectattr('read_tables') }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Let the table readers read the existing tables
+  community.postgresql.postgresql_privs:
+    login_db: "{{ item.database }}"
+    type: table
+    schema: public
+    objs: ALL_IN_SCHEMA
+    roles: "{{ item.name }}"
+    privs: SELECT
+  become: true
+  become_user: postgres
+  loop: "{{ postgresql_reader_roles | selectattr('read_tables') }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# The database's owner creates its tables, so the default privileges are its.
+- name: Let the table readers read the tables created later
+  community.postgresql.postgresql_privs:
+    login_db: "{{ item.database }}"
+    type: default_privs
+    schema: public
+    objs: TABLES
+    target_roles: "{{ item.database }}"
+    roles: "{{ item.name }}"
+    privs: SELECT
+  become: true
+  become_user: postgres
+  loop: "{{ postgresql_reader_roles | selectattr('read_tables') }}"
+  loop_control:
+    label: "{{ item.name }}"

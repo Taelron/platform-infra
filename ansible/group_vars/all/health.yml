@@ -2,9 +2,8 @@
 
 # HAProxy routes whose service is not built yet. Their backend is DOWN and
 # their public name answers 503 by design, so they show EXPECTED, not FAIL.
-# Remove a name when its phase builds it: aap in Phase 4 step 8, the clusters
-# in Phase 5.
-health_not_built: [aap, shared, test, demo]
+# Remove a name when its phase builds it: the clusters in Phase 5.
+health_not_built: [shared, test, demo]
 
 # Units that must be active.
 health_units:
