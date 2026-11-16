@@ -10,6 +10,15 @@
   when: garage_secrets is not defined or item not in garage_secrets
   no_log: true
 
+- name: Create the configuration folder
+  ansible.builtin.file:
+    path: /etc/garage
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+    setype: container_file_t
+
 # The container reads its files with the SELinux type container_file_t,
 # recorded as a file-context rule so a relabel keeps it.
 - name: Label the Garage files for the container
@@ -27,15 +36,6 @@
     label: "{{ item.item }}"
   when: item is changed and not ansible_check_mode
   changed_when: true
-
-- name: Create the configuration folder
-  ansible.builtin.file:
-    path: /etc/garage
-    state: directory
-    owner: root
-    group: root
-    mode: "0700"
-    setype: container_file_t
 
 - name: Write the Garage configuration
   ansible.builtin.template:
