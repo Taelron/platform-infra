@@ -1,0 +1,12 @@
+# The host platform-aws-01, from Platform Design Decisions (Zones, Where services listen).
+host_vpc_address: 10.20.1.10
+
+# Idle stop (decision 19): shut down after this many minutes with no SSH
+# session and no HTTPS request other than the load balancer's health checks.
+# Set idle_stop_enabled to false for the dates of a client trial.
+idle_stop_enabled: true
+idle_stop_minutes: 60
+
+# Amazon SSM Agent, for Session Manager (instance role from tofu/platform).
+ssm_agent_version: 3.3.5700.0
+ssm_agent_sha256: fd6c483dfb6f0752c09c9823a617cf5de60aecf5a18cd4d6acbbb454836342a5

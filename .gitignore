@@ -8,3 +8,6 @@ crash.log
 crash.*.log
 *_override.tf
 *_override.tf.json
+
+# Ansible
+ansible/collections/ansible_collections/
