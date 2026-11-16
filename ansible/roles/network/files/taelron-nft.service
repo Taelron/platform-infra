@@ -1,0 +1,18 @@
+# Loads only the table inet taelron, before the network comes up and before
+# forwarding is turned on. Unlike the stock nftables.service it never flushes
+# the whole ruleset, so the tables of libvirt, podman and k3s stay.
+[Unit]
+Description=Firewall of platform-aws-01 (table inet taelron)
+Wants=network-pre.target
+Before=network-pre.target systemd-sysctl.service shutdown.target
+Conflicts=shutdown.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/nftables/taelron.nft
+ExecReload=/usr/sbin/nft -f /etc/nftables/taelron.nft
+
+[Install]
+WantedBy=sysinit.target

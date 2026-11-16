@@ -36,6 +36,9 @@ An existing filesystem is never replaced, so a re-run never erases data.
 generated from `nft_flows` in `group_vars/all/network.yml`, which mirrors the
 design's flow table; anything not listed is dropped. Only the table
 `inet taelron` is replaced, so the tables of libvirt, podman and k3s stay.
+At boot `taelron-nft.service` loads it before the network and before
+forwarding; the stock `nftables.service` is masked, because it flushes the
+whole ruleset on reload and stop.
 Loading a new ruleset arms a 120-second rollback that is cancelled only once a
 new SSH connection gets through.
 
