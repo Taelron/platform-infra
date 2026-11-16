@@ -1,0 +1,6 @@
+---
+- name: Network
+  hosts: host
+  roles:
+    - role: network
+      tags: [network]

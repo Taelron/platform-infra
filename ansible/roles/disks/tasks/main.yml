@@ -1,0 +1,23 @@
+---
+# Each volume is found by its EBS volume ID. An existing filesystem is never
+# replaced (force: false), so a re-run never erases data.
+- name: Create an XFS filesystem on each data volume that has none
+  community.general.filesystem:
+    dev: "{{ disks_device_prefix }}{{ item.volume_id | replace('-', '') }}"
+    fstype: xfs
+    force: false
+  loop: "{{ data_volumes }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Mount each data volume
+  ansible.posix.mount:
+    src: "{{ disks_device_prefix }}{{ item.volume_id | replace('-', '') }}"
+    path: "{{ item.mount }}"
+    fstype: xfs
+    opts: defaults,nofail
+    state: mounted
+  loop: "{{ data_volumes }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Relabel the data volumes

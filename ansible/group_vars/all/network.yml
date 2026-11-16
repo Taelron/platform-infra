@@ -1,0 +1,115 @@
+# Zones, addresses and flows, copied from Platform Design Decisions
+# (Zones, Where services listen, Flows allowed by nftables). Every address a
+# role uses comes from here.
+
+host_vpc_interface: eth0
+vpc_subnets: [10.20.1.0/24, 10.20.2.0/24]
+aws_resolver: 10.20.0.2
+
+# The four bridges; the host is .1 on each. br-mgmt also carries the host
+# addresses of the services that run on the host itself.
+bridges:
+  - name: br-mgmt
+    prefix: 192.168.10
+    extra_hosts: [11, 12, 13, 14]
+  - name: br-shared
+    prefix: 192.168.20
+  - name: br-test
+    prefix: 192.168.30
+  - name: br-demo
+    prefix: 192.168.40
+
+# Host addresses on br-mgmt (decision 9).
+postgresql_address: 192.168.10.11
+aap_address: 192.168.10.12
+rancher_address: 192.168.10.13
+garage_address: 192.168.10.14
+
+# Per cluster: its VM and its gateway range (Zones).
+clusters:
+  shared:
+    bridge: br-shared
+    vm: 192.168.20.10
+    public_gateway: 192.168.20.200
+    internal_gateway: 192.168.20.201
+  test:
+    bridge: br-test
+    vm: 192.168.30.10
+    public_gateway: 192.168.30.200
+    internal_gateway: 192.168.30.201
+  demo:
+    bridge: br-demo
+    vm: 192.168.40.10
+    public_gateway: 192.168.40.200
+    internal_gateway: 192.168.40.201
+
+# Flows allowed by nftables, numbered as in the design's flow table; 11 to 14
+# added on 16 November 2026 (PO decision, TAE-138). Anything not listed is
+# dropped. "input" is traffic to an address on the host; "forward" is traffic
+# between bridges. Traffic from the host itself is not filtered (flows 2, 3,
+# 8, 12, 13, 14: the output chain accepts).
+nft_flows:
+  - id: 1
+    why: Load balancer to HAProxy
+    chain: input
+    iif: [eth0]
+    saddr: "{{ vpc_subnets }}"
+    daddr: ["{{ host_vpc_address }}"]
+    proto: tcp
+    dport: [443]
+  - id: 3
+    why: test and demo Alloy to the shared internal gateway
+    chain: forward
+    iif: [br-test, br-demo]
+    oif: [br-shared]
+    daddr: ["{{ clusters.shared.internal_gateway }}"]
+    proto: tcp
+    dport: [443]
+  - id: 4
+    why: shared delivers to the test and demo cluster API
+    chain: forward
+    iif: [br-shared]
+    oif: [br-test, br-demo]
+    daddr: ["{{ clusters.test.vm }}", "{{ clusters.demo.vm }}"]
+    proto: tcp
+    dport: [6443]
+  - id: 5
+    why: Rancher agents to HAProxy
+    chain: input
+    iif: [br-shared, br-test, br-demo]
+    daddr: ["{{ rancher_address }}"]
+    proto: tcp
+    dport: [443]
+  - id: 6
+    why: RKE2 control plane and apps to PostgreSQL
+    chain: input
+    iif: [br-shared, br-test, br-demo]
+    daddr: ["{{ postgresql_address }}"]
+    proto: tcp
+    dport: [5432]
+  - id: 7
+    why: Every VM to BIND on its own bridge
+    chain: input
+    per_bridge_gateway: [br-shared, br-test, br-demo]
+    proto: [tcp, udp]
+    dport: [53]
+  - id: 9
+    why: shared to Garage
+    chain: input
+    iif: [br-shared]
+    daddr: ["{{ garage_address }}"]
+    proto: tcp
+    dport: [3900]
+  - id: 10
+    why: test never reaches demo
+    chain: forward
+    iif: [br-test]
+    oif: [br-demo]
+    action: drop
+  - id: 11
+    why: SSH in, through Elastic IP 1 (the security group allows only the admin address)
+    chain: input
+    iif: [eth0]
+    daddr: ["{{ host_vpc_address }}"]
+    proto: tcp
+    dport: [22]

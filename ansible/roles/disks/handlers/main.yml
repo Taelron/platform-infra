@@ -1,0 +1,6 @@
+---
+# A fresh filesystem has no SELinux labels; give each mount point the label
+# its path has in the policy.
+- name: Relabel the data volumes
+  ansible.builtin.command: restorecon -R {{ data_volumes | map(attribute='mount') | join(' ') }}
+  changed_when: true
