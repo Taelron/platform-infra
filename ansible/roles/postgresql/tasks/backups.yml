@@ -7,6 +7,17 @@
   changed_when: "'already exists' not in postgresql_stanza.stdout ~ postgresql_stanza.stderr"
   when: not ansible_check_mode
 
+- name: Start WAL archiving now that the stanza exists
+  ansible.builtin.set_fact:
+    postgresql_archive_ready: true
+  when: not ansible_check_mode
+
+- name: Write the platform settings with archiving
+  ansible.builtin.import_tasks: settings.yml
+
+- name: Apply the archiving settings
+  ansible.builtin.meta: flush_handlers
+
 - name: Check that WAL archiving reaches S3
   ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} check
   become: true
