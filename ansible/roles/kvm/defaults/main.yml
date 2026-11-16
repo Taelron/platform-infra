@@ -1,0 +1,7 @@
+---
+kvm_libvirt_sockets:
+  - virtqemud.socket
+  - virtnetworkd.socket
+  - virtstoraged.socket
+  - virtnodedevd.socket
+  - virtsecretd.socket

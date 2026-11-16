@@ -1,0 +1,44 @@
+---
+- name: Check that the instance offers virtualization
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: kvm_device
+
+- name: Stop if /dev/kvm is missing
+  ansible.builtin.assert:
+    that: kvm_device.stat.exists
+    fail_msg: /dev/kvm is missing; the instance needs nested virtualization (tofu/platform).
+    quiet: true
+
+- name: Install KVM and libvirt
+  ansible.builtin.dnf:
+    name: [qemu-kvm, libvirt-daemon-kvm, libvirt-client, virt-install]
+    state: present
+
+# RHEL 9 runs libvirt as modular daemons, each started by its socket.
+- name: Start the libvirt daemons on demand
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop: "{{ kvm_libvirt_sockets }}"
+  ignore_errors: "{{ ansible_check_mode }}"
+
+# The VMs use the four bridges only; libvirt's own NAT network would add a
+# fifth zone, outside the design.
+- name: Look for libvirt's default network
+  ansible.builtin.command: virsh -c qemu:///system net-info default
+  register: kvm_default_network
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Remove libvirt's default network
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    virsh -c qemu:///system net-destroy default || true;
+    virsh -c qemu:///system net-undefine default
+  args:
+    executable: /bin/bash
+  when: kvm_default_network.rc == 0
+  changed_when: true

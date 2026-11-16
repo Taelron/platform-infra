@@ -1,0 +1,6 @@
+---
+- name: KVM
+  hosts: host
+  roles:
+    - role: kvm
+      tags: [kvm]

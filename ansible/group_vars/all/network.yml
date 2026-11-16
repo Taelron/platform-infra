@@ -6,6 +6,9 @@ host_vpc_interface: eth0
 vpc_subnets: [10.20.1.0/24, 10.20.2.0/24]
 aws_resolver: 10.20.0.2
 
+# Pod range of the mgmt cluster (k3s default), on the host's bridge cni0.
+k3s_pod_cidr: 10.42.0.0/16
+
 # The four bridges; the host is .1 on each. br-mgmt also carries the host
 # addresses of the services that run on the host itself.
 bridges:
@@ -44,7 +47,7 @@ clusters:
     internal_gateway: 192.168.40.201
 
 # Flows allowed by nftables, numbered as in the design's flow table; 11 to 14
-# added on 16 November 2026 (PO decision, TAE-138). Anything not listed is
+# and 15 to 17 added on 16 November 2026 (PO decisions, TAE-138). Anything not listed is
 # dropped. "input" is traffic to an address on the host; "forward" is traffic
 # between bridges. Traffic from the host itself is not filtered (flows 2, 3,
 # 8, 12, 13, 14: the output chain accepts).
@@ -113,3 +116,36 @@ nft_flows:
     daddr: ["{{ host_vpc_address }}"]
     proto: tcp
     dport: [22]
+
+  # The mgmt cluster's own pods (k3s on the host), on cni0 only.
+  - id: 15
+    why: k3s pods to the host's k3s API and kubelet
+    chain: input
+    iif: [cni0]
+    saddr: ["{{ k3s_pod_cidr }}"]
+    daddr: ["{{ host_vpc_address }}"]
+    proto: tcp
+    dport: [6443, 10250]
+  - id: 16
+    why: k3s pods to k3s pods
+    chain: forward
+    iif: [cni0]
+    oif: [cni0]
+    saddr: ["{{ k3s_pod_cidr }}"]
+  - id: 17
+    why: k3s pods to the internet through NAT (images, charts)
+    chain: forward
+    iif: [cni0]
+    oif: [eth0]
+    saddr: ["{{ k3s_pod_cidr }}"]
+    proto: tcp
+    dport: [443]
+  - id: 17
+    why: k3s pods to the AWS resolver (CoreDNS forwards to the host's resolver)
+    chain: forward
+    iif: [cni0]
+    oif: [eth0]
+    saddr: ["{{ k3s_pod_cidr }}"]
+    daddr: ["{{ aws_resolver }}"]
+    proto: [udp, tcp]
+    dport: [53]

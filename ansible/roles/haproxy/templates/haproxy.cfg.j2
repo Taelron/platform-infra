@@ -49,7 +49,8 @@ backend be_unknown
 {% for r in haproxy_routes %}
 backend be_{{ r.name }}
   mode http
-  server {{ r.name }} {{ r.server }} ssl verify none sni req.hdr(host),field(1,:)
+  # Checked every 10 seconds, so a name whose backend is down answers 503 at once.
+  server {{ r.name }} {{ r.server }} ssl verify none sni req.hdr(host),field(1,:) check check-sni {{ r.hosts[0] if r.hosts is defined else ('check' ~ r.domain) }} inter 10s fall 2 rise 1
 
 {% endfor %}
 # Rancher agents from the clusters (flow 5), passed through over TCP.
