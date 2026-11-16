@@ -1,0 +1,6 @@
+---
+- name: Disks
+  hosts: host
+  roles:
+    - role: disks
+      tags: [disks]

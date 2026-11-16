@@ -1,0 +1,58 @@
+#!/usr/sbin/nft -f
+# {{ ansible_managed }}
+# Firewall of platform-aws-01, generated from nft_flows in group_vars
+# (Platform Design Decisions, Flows allowed by nftables). Anything not listed
+# is dropped. Only this table is replaced on reload: tables of libvirt, podman
+# or k3s are left alone.
+
+table inet taelron
+delete table inet taelron
+
+table inet taelron {
+  chain input {
+    type filter hook input priority filter; policy drop;
+
+    iifname "lo" accept
+    ct state established,related accept
+    ct state invalid drop
+
+    # Needed by IPv4 itself: path MTU and errors.
+    icmp type { destination-unreachable, time-exceeded, parameter-problem } accept
+    # DHCP answers from the VPC on {{ host_vpc_interface }} (address renewal at boot).
+    iifname "{{ host_vpc_interface }}" udp sport 67 udp dport 68 accept
+
+{% for f in nft_flows if f.chain == 'input' %}
+    # Flow {{ f.id }}: {{ f.why }}
+{% if f.per_bridge_gateway is defined %}
+{% for b in bridges if b.name in f.per_bridge_gateway %}
+{% for p in ([f.proto] if f.proto is string else f.proto) %}
+    iifname "{{ b.name }}" ip daddr {{ b.prefix }}.1 {{ p }} dport { {{ f.dport | join(', ') }} } accept
+{% endfor %}
+{% endfor %}
+{% else %}
+    iifname { {{ f.iif | map('to_json') | join(', ') }} }{% if f.saddr is defined %} ip saddr { {{ f.saddr | join(', ') }} }{% endif %}{% if f.daddr is defined %} ip daddr { {{ f.daddr | join(', ') }} }{% endif %} {{ f.proto }} dport { {{ f.dport | join(', ') }} } {{ f.action | default('accept') }}
+{% endif %}
+{% endfor %}
+  }
+
+  chain forward {
+    type filter hook forward priority filter; policy drop;
+
+    ct state invalid drop
+{% for f in nft_flows if f.chain == 'forward' and (f.action | default('accept')) == 'drop' %}
+    # Flow {{ f.id }}: {{ f.why }}
+    iifname { {{ f.iif | map('to_json') | join(', ') }} } oifname { {{ f.oif | map('to_json') | join(', ') }} } drop
+{% endfor %}
+    ct state established,related accept
+
+{% for f in nft_flows if f.chain == 'forward' and (f.action | default('accept')) == 'accept' %}
+    # Flow {{ f.id }}: {{ f.why }}
+    iifname { {{ f.iif | map('to_json') | join(', ') }} } oifname { {{ f.oif | map('to_json') | join(', ') }} } ip daddr { {{ f.daddr | join(', ') }} } {{ f.proto }} dport { {{ f.dport | join(', ') }} } accept
+{% endfor %}
+  }
+
+  chain output {
+    # Flows 2, 3, 8, 12, 13, 14: traffic from the host itself.
+    type filter hook output priority filter; policy accept;
+  }
+}

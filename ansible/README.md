@@ -24,6 +24,20 @@ inventory.
 | Role   | Does                                                    |
 |--------|---------------------------------------------------------|
 | `base` | SELinux, SSH by key, firewalld off, updates, idle stop  |
+| `disks`   | data volumes by EBS ID, XFS, mounted                 |
+| `network` | bridges, host addresses, forwarding, nftables        |
+
+`disks`: each volume is found by its EBS volume ID
+(`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
+An existing filesystem is never replaced, so a re-run never erases data.
+
+`network`: the four bridges with the host at `.1`, the service addresses
+`.11`–`.14` on br-mgmt, IPv4 forwarding, and the firewall. The ruleset is
+generated from `nft_flows` in `group_vars/all/network.yml`, which mirrors the
+design's flow table; anything not listed is dropped. Only the table
+`inet taelron` is replaced, so the tables of libvirt, podman and k3s stay.
+Loading a new ruleset arms a 120-second rollback that is cancelled only once a
+new SSH connection gets through.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

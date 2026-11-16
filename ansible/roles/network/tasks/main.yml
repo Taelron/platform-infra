@@ -1,0 +1,74 @@
+---
+- name: Create the bridges, the host at .1 on each
+  community.general.nmcli:
+    conn_name: "{{ item.name }}"
+    ifname: "{{ item.name }}"
+    type: bridge
+    stp: false
+    method4: manual
+    ip4: >-
+      {{ [item.prefix ~ '.1/24']
+         + ((item.extra_hosts | default([])) | map('regex_replace', '^(.*)$', item.prefix ~ '.\1/24') | list) }}
+    method6: disabled
+    autoconnect: true
+    state: present
+  loop: "{{ bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Bring the bridges up
+  ansible.builtin.command: nmcli connection up {{ item.name }}
+  loop: "{{ bridges }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in ansible_facts.interfaces
+  changed_when: true
+
+- name: Forward IPv4 between the bridges
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_file: /etc/sysctl.d/90-taelron.conf
+    state: present
+    reload: true
+
+- name: Install nftables
+  ansible.builtin.dnf:
+    name: nftables
+    state: present
+
+- name: Create the nftables folder
+  ansible.builtin.file:
+    path: /etc/nftables
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write the firewall from the flow list
+  ansible.builtin.template:
+    src: taelron.nft.j2
+    dest: /etc/nftables/taelron.nft
+    owner: root
+    group: root
+    mode: "0600"
+    validate: /usr/sbin/nft -c -f %s
+  register: network_ruleset
+
+- name: Load the firewall at boot
+  ansible.builtin.lineinfile:
+    path: /etc/sysconfig/nftables.conf
+    line: include "/etc/nftables/taelron.nft"
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Load the firewall, with a rollback if the host stops answering
+  ansible.builtin.import_tasks: load_firewall.yml
+  when: network_ruleset is changed and not ansible_check_mode
+
+- name: Run nftables at boot
+  ansible.builtin.systemd_service:
+    name: nftables
+    enabled: true

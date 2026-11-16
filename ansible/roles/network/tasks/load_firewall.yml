@@ -1,0 +1,29 @@
+---
+# A new ruleset could cut SSH. Before loading it, a timer is armed that puts
+# the previous ruleset back after 120 seconds; it is cancelled only once a new
+# SSH connection gets through.
+- name: Save the running ruleset
+  ansible.builtin.shell: nft list ruleset > /var/lib/taelron-nft-previous.nft
+  changed_when: false
+
+- name: Arm the rollback
+  ansible.builtin.command: >-
+    systemd-run --unit=taelron-nft-rollback --on-active=120
+    /bin/sh -c 'nft flush ruleset && nft -f /var/lib/taelron-nft-previous.nft'
+  changed_when: true
+
+- name: Load the new ruleset
+  ansible.builtin.command: nft -f /etc/nftables/taelron.nft
+  changed_when: true
+
+- name: Open a new SSH connection through the new ruleset
+  ansible.builtin.meta: reset_connection
+
+- name: Wait for the host to answer
+  ansible.builtin.wait_for_connection:
+    timeout: 60
+
+- name: Cancel the rollback
+  ansible.builtin.systemd_service:
+    name: taelron-nft-rollback.timer
+    state: stopped
