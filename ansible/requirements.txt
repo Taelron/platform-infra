@@ -1,0 +1,6 @@
+# Python packages for running these playbooks from a person's box, in a
+# virtual environment of their own (see README.md). Same boto3 and botocore
+# as AAP's execution environment, ee-supported-rhel9.
+ansible-core==2.19.0
+boto3==1.38.27
+botocore==1.38.27

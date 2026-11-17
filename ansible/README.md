@@ -16,6 +16,8 @@ is installed, AAP runs the same playbooks as job templates from GitHub.
 | `playbooks/health.yml`        | platform health check, read-only         |
 | `roles/`                      | one role per Runbook item, tag = name    |
 | `collections/requirements.yml`| pinned collections                       |
+| `requirements.txt`            | pinned Python packages, for `.venv`      |
+| `playbooks/secrets_to_ssm.yml`| core secrets, `pass` to SSM, RHEL box    |
 
 `inventory/group_vars` links to `group_vars`, so Ansible reads it next to the
 inventory.
@@ -151,22 +153,51 @@ Host platform-aws-01
 ```
 
 The key's passphrase is in `pass` (`taelron/ssh/platform-passphrase`); load the
-key into `ssh-agent` first. Then, from this folder:
+key into `ssh-agent` first.
+
+The playbooks run in a virtual environment of their own, `.venv` (not in
+Git), with the Python packages pinned in `requirements.txt`: ansible-core,
+and `boto3` and `botocore` for the SSM lookups, the same versions as AAP's
+execution environment. A virtual environment keeps them apart from any other
+Python tool on the box. Once, from this folder:
 
 ```
-ansible-galaxy collection install -r collections/requirements.yml -p collections
-ansible-playbook playbooks/site.yml --check --diff
-ansible-playbook playbooks/site.yml
+python3.11 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/ansible-galaxy collection install -r collections/requirements.yml -p collections
+```
+
+Then, signed in to AWS (`aws sso login --profile platform --use-device-code`):
+
+```
+export AWS_PROFILE=platform
+.venv/bin/ansible-playbook playbooks/site.yml --check --diff
+.venv/bin/ansible-playbook playbooks/site.yml
 ```
 
 One role only: `ansible-playbook playbooks/base.yml`, or `--tags base`.
 Every change runs with `--check --diff` first; its output goes in the pull
 request. The first real run waits for Gaetan's go.
 
+## Core secrets in SSM
+
+The core layer's secrets move from `pass` to AWS SSM Parameter Store
+(Platform Design Decisions 30). `playbooks/secrets_to_ssm.yml` copies every
+entry under `taelron/platform/` in `pass` to a SecureString with the same
+relative name under `/taelron/core/` (for example `taelron/platform/k3s/token`
+becomes `/taelron/core/k3s/token`), then reads each one back and checks it
+equals `pass`. RHEL box only; only Gaetan writes:
+
+```
+AWS_PROFILE=platform .venv/bin/ansible-playbook playbooks/secrets_to_ssm.yml
+```
+
+A second run changes nothing. No value is printed.
+
 ## Health check
 
 ```
-ansible-playbook playbooks/health.yml
+.venv/bin/ansible-playbook playbooks/health.yml
 ```
 
 Read-only; it changes nothing, also under `--check`. One line per check:

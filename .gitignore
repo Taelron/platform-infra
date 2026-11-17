@@ -11,3 +11,4 @@ crash.*.log
 
 # Ansible
 ansible/collections/ansible_collections/
+ansible/.venv/
