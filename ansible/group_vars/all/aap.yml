@@ -3,8 +3,8 @@
 
 # The online installer, downloaded from Red Hat to the RHEL box (not in Git).
 # The role copies it to the host and checks it against this checksum.
-aap_installer_file: ""
-aap_installer_sha256: ""
+aap_installer_file: ansible-automation-platform-containerized-setup-2.7-1.tar.gz
+aap_installer_sha256: 1034fcaa0e157908a865f18b4a97c7e8e9d03fb3944aec26e0f9fb6ec4aa2816
 aap_installer_src: "{{ lookup('ansible.builtin.env', 'HOME') }}/Downloads/{{ aap_installer_file }}"
 
 # AAP runs rootless as this user; its home, on the AAP volume, holds the
