@@ -12,11 +12,13 @@
     path: /etc/sudoers.d/aap-install
     state: absent
 
-- name: Read AAP's secrets from pass
+- name: Read AAP's secrets from SSM
   ansible.builtin.set_fact:
     aap_secrets: >-
-      {{ (aap_secrets | default({})) | combine({item.key: lookup('community.general.passwordstore', item.value)}) }}
-  loop: "{{ aap_pass_entries | dict2items }}"
+      {{ (aap_secrets | default({}))
+         | combine({item.key: lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/' ~ item.value,
+                                     region=core_secrets_region)}) }}
+  loop: "{{ aap_secret_names | dict2items }}"
   no_log: true
 
 - name: Read the Registry Service Account from pass

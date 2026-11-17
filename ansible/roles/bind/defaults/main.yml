@@ -2,5 +2,4 @@
 bind_package: bind9.18
 
 # bind_update_keys: TSIG secret per cluster, {shared: ..., test: ..., demo: ...}.
-# Not set here: on the RHEL box the role reads it from pass
-# (taelron/platform/bind/<cluster>); AAP passes it from its credentials.
+# Not set here: the role reads it from SSM (core_secrets_prefix/bind/<cluster>).

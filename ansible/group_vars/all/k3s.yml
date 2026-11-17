@@ -19,8 +19,8 @@ k3s_ingress_bind: 127.0.0.1
 k3s_ingress_https_port: 8443
 k3s_ingress_http_port: 8000
 
-# Secrets, read at run time from pass: the k3s database password
-# (taelron/platform/postgresql/k3s), the k3s server token
-# (taelron/platform/k3s/token, needed to restore k3s from its database) and
-# Rancher's first admin password (taelron/platform/rancher/admin-password,
+# Secrets, read at run time from SSM (secrets.yml): the k3s database password
+# (postgresql/k3s), the k3s server token (k3s/token, needed to restore k3s
+# from its database) and Rancher's first admin password
+# (rancher/admin-password,
 # the break-glass account, decision 5).

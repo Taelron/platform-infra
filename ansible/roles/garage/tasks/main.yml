@@ -1,9 +1,9 @@
 ---
-- name: Read the Garage secrets from pass
+- name: Read the Garage secrets from SSM
   ansible.builtin.set_fact:
     garage_secrets: >-
       {{ (garage_secrets | default({}))
-         | combine({item: lookup('community.general.passwordstore', 'taelron/platform/garage/' ~ item)}) }}
+         | combine({item: lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/garage/' ~ item, region=core_secrets_region)}) }}
   loop: >-
     {{ ['rpc-secret', 'admin-token', 'metrics-token']
        + (garage_buckets | product(['-key-id', '-key-secret']) | map('join') | list) }}

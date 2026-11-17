@@ -36,15 +36,16 @@ aap_ports:
   gateway_redis_port: 6379
   receptor_port: 27199
 
-# Secrets, read at run time from pass: the admin passwords
-# (taelron/platform/aap/{admin-password,controller-admin-password,
-# hub-admin-password,eda-admin-password}), the database passwords
-# (taelron/platform/postgresql/<role>) and the Registry Service Account
-# (taelron/redhat/registry: username, then token). No subscription manifest:
+# Secrets, read at run time from SSM (secrets.yml): the admin passwords
+# (aap/{admin-password,controller-admin-password,hub-admin-password,
+# eda-admin-password}) and the database passwords (postgresql/<role>). The
+# Registry Service Account is a person's credential and stays in pass
+# (taelron/redhat/registry: username, then token); role aap runs from the
+# RHEL box only. No subscription manifest:
 # the subscription is activated after the install, in the AAP UI.
 
 # AAP's own SSH key, for its job templates (flow 18). The private key is in
-# pass (taelron/platform/aap/ssh-key) and in AAP's Machine credential; the
+# SSM (aap/ssh-key) and in AAP's Machine credential; the
 # public key is not a secret. Role base authorises it for this user, from the
 # host's own address only: AAP's job containers (slirp4netns) connect from it.
 aap_ssh_user: ec2-user

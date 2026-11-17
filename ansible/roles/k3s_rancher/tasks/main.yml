@@ -1,12 +1,14 @@
 ---
-- name: Read the k3s and Rancher secrets from pass
+- name: Read the k3s and Rancher secrets from SSM
   ansible.builtin.set_fact:
     k3s_rancher_db_password: >-
-      {{ k3s_rancher_db_password | default(lookup('community.general.passwordstore', 'taelron/platform/postgresql/k3s')) }}
+      {{ k3s_rancher_db_password | default(lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/postgresql/k3s', region=core_secrets_region)) }}
     k3s_rancher_token: >-
-      {{ k3s_rancher_token | default(lookup('community.general.passwordstore', 'taelron/platform/k3s/token')) }}
+      {{ k3s_rancher_token | default(lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/k3s/token', region=core_secrets_region)) }}
     k3s_rancher_admin_password: >-
-      {{ k3s_rancher_admin_password | default(lookup('community.general.passwordstore', 'taelron/platform/rancher/admin-password')) }}
+      {{ k3s_rancher_admin_password
+         | default(lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/rancher/admin-password',
+                          region=core_secrets_region)) }}
   no_log: true
 
 - name: Install k3s's SELinux policy

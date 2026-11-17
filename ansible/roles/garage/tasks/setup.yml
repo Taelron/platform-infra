@@ -63,7 +63,7 @@
   register: garage_keys
   no_log: true
 
-- name: Import each missing key from pass
+- name: Import each missing key from the stored secrets
   ansible.builtin.uri:
     url: http://127.0.0.1:3903/v2/ImportKey
     method: POST

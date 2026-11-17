@@ -1,9 +1,9 @@
 ---
-- name: Read the update keys from pass
+- name: Read the update keys from SSM
   ansible.builtin.set_fact:
     bind_update_keys: >-
       {{ (bind_update_keys | default({}))
-         | combine({item: lookup('community.general.passwordstore', 'taelron/platform/bind/' ~ item)}) }}
+         | combine({item: lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/bind/' ~ item, region=core_secrets_region)}) }}
   loop: "{{ dns_update_clusters }}"
   when: bind_update_keys is not defined or item not in bind_update_keys
   no_log: true

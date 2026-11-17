@@ -1,17 +1,17 @@
 ---
-# Where each secret is in pass.
-aap_pass_entries:
-  gateway_admin: taelron/platform/aap/admin-password
-  controller_admin: taelron/platform/aap/controller-admin-password
-  hub_admin: taelron/platform/aap/hub-admin-password
-  eda_admin: taelron/platform/aap/eda-admin-password
-  gateway_pg: taelron/platform/postgresql/aap_gateway
-  controller_pg: taelron/platform/postgresql/aap_controller
-  hub_pg: taelron/platform/postgresql/aap_hub
-  eda_pg: taelron/platform/postgresql/aap_eda
-  metrics_pg: taelron/platform/postgresql/aap_metrics
-  metrics_reader_pg: taelron/platform/postgresql/ms_awx_readonly
-  event_stream_pg: taelron/platform/postgresql/eda_event_stream
+# Where each secret is, under core_secrets_prefix in SSM.
+aap_secret_names:
+  gateway_admin: aap/admin-password
+  controller_admin: aap/controller-admin-password
+  hub_admin: aap/hub-admin-password
+  eda_admin: aap/eda-admin-password
+  gateway_pg: postgresql/aap_gateway
+  controller_pg: postgresql/aap_controller
+  hub_pg: postgresql/aap_hub
+  eda_pg: postgresql/aap_eda
+  metrics_pg: postgresql/aap_metrics
+  metrics_reader_pg: postgresql/ms_awx_readonly
+  event_stream_pg: postgresql/eda_event_stream
 
 # The installer unpacks into a folder named like its archive.
 aap_installer_dir: "{{ aap_home }}/{{ aap_installer_file | regex_replace('\\.tar\\.gz$', '') }}"
