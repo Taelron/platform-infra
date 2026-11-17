@@ -38,7 +38,9 @@
 - name: Label the AAP volume like /home
   ansible.builtin.command: semanage fcontext -a -e /home /var/lib/aap
   register: aap_fcontext
-  changed_when: aap_fcontext.rc == 0
+  # On an existing equivalence semanage says "already exists, modifying
+  # instead" and still returns 0: that is no change.
+  changed_when: aap_fcontext.rc == 0 and 'already exists' not in aap_fcontext.stderr
   failed_when: aap_fcontext.rc != 0 and 'already defined' not in aap_fcontext.stderr
   notify: Relabel the AAP volume
 
