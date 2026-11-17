@@ -1,6 +1,13 @@
 # PostgreSQL on the host (Platform Design Decisions 7, Where services listen).
 postgresql_stream: "15"
 
+# PostgreSQL's default, 100, is too few: AAP 2.7 alone opens about 84 (EDA 27,
+# hub 27, gateway 17, controller 7, metrics 6) and the controller then fails
+# with "remaining connection slots are reserved". 1024 is what AAP's installer
+# sets for its own database (postgresql_max_connections). Changing it restarts
+# PostgreSQL.
+postgresql_max_connections: 1024
+
 # One database and one role of the same name per consumer, each reachable
 # only from where that consumer runs. Host consumers (k3s, AAP) connect from
 # a host address on br-mgmt; the clusters from their VM, over TLS. Passwords
