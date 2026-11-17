@@ -3,6 +3,7 @@
 
 listen_addresses = '127.0.0.1,{{ postgresql_address }}'
 password_encryption = scram-sha-256
+max_connections = {{ postgresql_max_connections }}
 
 ssl = on
 ssl_cert_file = 'server.crt'
