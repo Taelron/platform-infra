@@ -33,7 +33,6 @@ all:
     controller_pg_password: {{ s.controller_pg | to_json }}
     controller_pg_sslmode: require
     controller_percent_memory_capacity: 0.5
-    controller_license_file: {{ (aap_home ~ '/manifest.zip') | to_json }}
 
     hub_admin_password: {{ s.hub_admin | to_json }}
     hub_pg_host: {{ pg }}

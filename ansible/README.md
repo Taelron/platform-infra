@@ -123,8 +123,10 @@ runs again only when its inventory or archive changes, or when the gateway
 does not answer. Envoy, AAP's entry, is on 9443 for HAProxy; no AAP listener
 has a bind address, so nftables keeps the rest out. Secrets in `pass`: the
 admin passwords (`taelron/platform/aap/`), the database passwords, the
-Registry Service Account (`taelron/redhat/registry`: username, then token) and
-the subscription manifest in base64 (`taelron/redhat/aap-manifest`).
+Registry Service Account (`taelron/redhat/registry`: username, then token).
+The install takes no subscription manifest: once AAP answers, Gaetan activates
+the subscription once in the AAP UI by signing in to Red Hat. Job templates
+run only after that.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

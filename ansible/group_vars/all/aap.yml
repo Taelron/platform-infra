@@ -37,6 +37,6 @@ aap_ports:
 # Secrets, read at run time from pass: the admin passwords
 # (taelron/platform/aap/{admin-password,controller-admin-password,
 # hub-admin-password,eda-admin-password}), the database passwords
-# (taelron/platform/postgresql/<role>), the Registry Service Account
-# (taelron/redhat/registry: username, then token) and the subscription
-# manifest, base64 (taelron/redhat/aap-manifest).
+# (taelron/platform/postgresql/<role>) and the Registry Service Account
+# (taelron/redhat/registry: username, then token). No subscription manifest:
+# the subscription is activated after the install, in the AAP UI.

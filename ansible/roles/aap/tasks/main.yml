@@ -19,13 +19,12 @@
   loop: "{{ aap_pass_entries | dict2items }}"
   no_log: true
 
-- name: Read the Registry Service Account and the manifest from pass
+- name: Read the Registry Service Account from pass
   ansible.builtin.set_fact:
     aap_secrets: >-
       {{ aap_secrets | combine({
            'registry_username': registry[0],
-           'registry_password': registry[1],
-           'manifest_b64': lookup('community.general.passwordstore', 'taelron/redhat/aap-manifest', returnall=true) | trim}) }}
+           'registry_password': registry[1]}) }}
   vars:
     registry: "{{ lookup('community.general.passwordstore', 'taelron/redhat/registry', returnall=true).splitlines() }}"
   no_log: true
@@ -92,16 +91,6 @@
     creates: "{{ aap_installer_dir }}"
   when: not ansible_check_mode or aap_archive_stat.stat.exists
 
-- name: Write the subscription manifest, base64
-  ansible.builtin.copy:
-    content: "{{ aap_secrets.manifest_b64 }}"
-    dest: "{{ aap_home }}/manifest.zip.b64"
-    owner: "{{ aap_user }}"
-    group: "{{ aap_user }}"
-    mode: "0600"
-  no_log: true
-  notify: Decode the subscription manifest
-
 - name: Write the installer's inventory
   ansible.builtin.template:
     src: inventory.yml.j2
@@ -120,9 +109,6 @@
   register: aap_ping
   failed_when: false
   check_mode: false
-
-- name: Decode the manifest before the installer reads it
-  ansible.builtin.meta: flush_handlers
 
 - name: Install AAP
   ansible.builtin.import_tasks: install.yml
