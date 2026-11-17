@@ -50,3 +50,35 @@ aap_ports:
 # host's own address only: AAP's job containers (slirp4netns) connect from it.
 aap_ssh_user: ec2-user
 aap_ssh_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJIuOL10ceYWAS7EA4PmcGHtst5Iq8esFpvhFSKwXHNR aap@platform-aws-01
+
+# AAP's configuration, written by playbooks/aap_config.yml from the RHEL box.
+# AAP runs a job from the repository root, without ansible/ansible.cfg: the
+# playbooks find their roles and group_vars through the links next to them
+# (playbooks/roles, playbooks/group_vars), and the project sync installs the
+# collections from collections/requirements.yml at the root (a link).
+aap_config_organization: Taelron
+aap_config_project: platform-infra
+aap_config_project_url: https://github.com/Taelron/platform-infra.git
+aap_config_project_branch: main
+aap_config_inventory: platform
+aap_config_machine_credential: platform-aws-01
+aap_config_registry_credential: registry.redhat.io
+# The execution environment, pinned by digest (ee-supported-rhel9, AAP 2.7).
+aap_config_ee_name: Taelron EE
+aap_config_ee_image: >-
+  registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9@sha256:478010307f8794cf96dac319201f81dfeba5d1b8ab826387dd9781bc41849bd0
+# One job template per playbook AAP runs: every role except aap, site and
+# the health check. Named "core: <playbook>".
+aap_config_playbooks:
+  - site
+  - base
+  - disks
+  - network
+  - bind
+  - postgresql
+  - garage
+  - haproxy
+  - alloy
+  - kvm
+  - k3s_rancher
+  - health

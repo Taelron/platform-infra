@@ -18,6 +18,7 @@ is installed, AAP runs the same playbooks as job templates from GitHub.
 | `collections/requirements.yml`| pinned collections                       |
 | `requirements.txt`            | pinned Python packages, for `.venv`      |
 | `playbooks/secrets_to_ssm.yml`| core secrets, `pass` to SSM, RHEL box    |
+| `playbooks/aap_config.yml`    | AAP's configuration, RHEL box            |
 
 `inventory/group_vars` links to `group_vars`, so Ansible reads it next to the
 inventory.
@@ -202,6 +203,40 @@ AWS_PROFILE=platform .venv/bin/ansible-playbook playbooks/secrets_to_ssm.yml
 ```
 
 A second run changes nothing. No value is printed.
+
+## AAP configuration
+
+AAP runs the host's playbooks as job templates, from the project
+`platform-infra` on GitHub (`main`). `playbooks/aap_config.yml` writes that
+configuration: organisation `Taelron`, the Container Registry credential
+(the Red Hat registry account, from `pass`), the Machine credential (AAP's
+SSH key, from SSM, authorised by role `base` from `10.20.1.10` only), the
+execution environment pinned by digest, the project, the inventory `platform`
+with the host at its own address, and one job template per playbook, named
+`core: <playbook>`: `site`, every role except `aap`, and `health`.
+
+AAP runs a job from the repository root, without `ansible/ansible.cfg`. The
+playbooks find their roles and `group_vars` through the links next to them
+(`playbooks/roles`, `playbooks/group_vars`); the project sync installs the
+collections from `collections/requirements.yml` at the root, a link to
+`ansible/collections/requirements.yml`.
+
+`ansible.controller` and `ansible.platform` ship with AAP's installer, not on
+Galaxy. Once, from this folder, with the installer archive in `~/Downloads`:
+
+```
+d=$(mktemp -d); tar -xzf ~/Downloads/ansible-automation-platform-containerized-setup-2.7-1.tar.gz -C $d
+for c in controller platform; do .venv/bin/ansible-galaxy collection install $d/*/collections/ansible_collections/ansible/$c -p collections; done; rm -rf $d
+```
+
+Then, signed in to AWS:
+
+```
+AWS_PROFILE=platform .venv/bin/ansible-playbook playbooks/aap_config.yml
+```
+
+A second run changes nothing: the credentials' secrets are written once. After
+rotating one, add `-e aap_config_update_secrets=true`.
 
 ## Health check
 
