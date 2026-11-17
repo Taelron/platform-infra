@@ -74,6 +74,31 @@ resource "aws_iam_role_policy" "host_backups" {
   policy = data.aws_iam_policy_document.host_backups.json
 }
 
+# Core secrets (Platform Design Decisions 30): the host reads SSM parameters
+# under /taelron/core/ only. AmazonSSMManagedInstanceCore allows
+# ssm:GetParameter and ssm:GetParameters on "*", so the limit is a deny: it
+# wins over that allow. No KMS statement: the aws/ssm key lets a principal of
+# the account decrypt through SSM.
+data "aws_iam_policy_document" "host_core_secrets" {
+  statement {
+    sid    = "OnlyCoreSecrets"
+    effect = "Deny"
+    actions = [
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+      "ssm:GetParametersByPath",
+      "ssm:GetParameterHistory",
+    ]
+    not_resources = ["arn:aws:ssm:*:*:parameter/taelron/core/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "host_core_secrets" {
+  name   = "core-secrets"
+  role   = aws_iam_role.host.id
+  policy = data.aws_iam_policy_document.host_core_secrets.json
+}
+
 resource "aws_iam_instance_profile" "host" {
   name = "platform-host"
   role = aws_iam_role.host.name
