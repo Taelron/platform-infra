@@ -46,6 +46,13 @@
         name: "{{ aap_config_organization }}"
         description: Taelron Platform
 
+    # Without a Galaxy credential on its organisation, the project sync skips
+    # collections/requirements.yml ("Collection and role syncing disabled").
+    - name: Let the organisation's projects install collections from Galaxy
+      ansible.controller.organization:
+        name: "{{ aap_config_organization }}"
+        galaxy_credentials: ["{{ aap_config_galaxy_credential }}"]
+
     - name: Registry credential, to pull the execution environment
       ansible.controller.credential:
         name: "{{ aap_config_registry_credential }}"
