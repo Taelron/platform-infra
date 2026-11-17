@@ -116,6 +116,14 @@ nft_flows:
     daddr: ["{{ host_vpc_address }}"]
     proto: tcp
     dport: [22]
+  - id: 18
+    why: AAP's job containers on the host to the host's sshd (local, on lo)
+    chain: input
+    iif: [lo]
+    saddr: ["{{ host_vpc_address }}"]
+    daddr: ["{{ host_vpc_address }}"]
+    proto: tcp
+    dport: [22]
 
   # The mgmt cluster's own pods (k3s on the host), on cni0 only.
   - id: 15

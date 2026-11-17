@@ -42,3 +42,10 @@ aap_ports:
 # (taelron/platform/postgresql/<role>) and the Registry Service Account
 # (taelron/redhat/registry: username, then token). No subscription manifest:
 # the subscription is activated after the install, in the AAP UI.
+
+# AAP's own SSH key, for its job templates (flow 18). The private key is in
+# pass (taelron/platform/aap/ssh-key) and in AAP's Machine credential; the
+# public key is not a secret. Role base authorises it for this user, from the
+# host's own address only: AAP's job containers (slirp4netns) connect from it.
+aap_ssh_user: ec2-user
+aap_ssh_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJIuOL10ceYWAS7EA4PmcGHtst5Iq8esFpvhFSKwXHNR aap@platform-aws-01

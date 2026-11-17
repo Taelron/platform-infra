@@ -40,6 +40,13 @@
     validate: /usr/sbin/sshd -t -f %s
   notify: Reload sshd
 
+- name: Let AAP sign in, from the host's own address only
+  ansible.posix.authorized_key:
+    user: "{{ aap_ssh_user }}"
+    key: "{{ aap_ssh_public_key }}"
+    key_options: from="{{ host_vpc_address }}"
+    state: present
+
 - name: Install dnf-automatic
   ansible.builtin.dnf:
     name: dnf-automatic
