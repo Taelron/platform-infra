@@ -44,7 +44,8 @@
   ansible.posix.authorized_key:
     user: "{{ aap_ssh_user }}"
     key: "{{ aap_ssh_public_key }}"
-    key_options: from="{{ host_vpc_address }}"
+    # restrict: no forwarding of any kind, no pty; Ansible (pipelining) needs none.
+    key_options: restrict,from="{{ host_vpc_address }}"
     state: present
 
 - name: Install dnf-automatic
