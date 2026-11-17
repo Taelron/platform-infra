@@ -28,6 +28,8 @@ aap_ports:
   hub_nginx_http_port: 8081
   eda_nginx_https_port: 8445
   eda_nginx_http_port: 8082
+  # EDA's API on the loopback; 8000 is Traefik's (k3s).
+  eda_gunicorn_port: 8084
   automationmetrics_nginx_https_port: 8450
   automationmetrics_nginx_http_port: 8087
   automationmetrics_api_port: 8006
