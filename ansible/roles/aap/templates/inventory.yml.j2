@@ -17,6 +17,7 @@ all:
     registry_username: {{ s.registry_username | to_json }}
     registry_password: {{ s.registry_password | to_json }}
     redis_mode: standalone
+    custom_ca_cert: {{ (aap_home ~ '/postgresql-ca.crt') | to_json }}
 
     gateway_main_url: "https://{{ aap_hostname }}"
     gateway_admin_password: {{ s.gateway_admin | to_json }}

@@ -91,6 +91,18 @@
     creates: "{{ aap_installer_dir }}"
   when: not ansible_check_mode or aap_archive_stat.stat.exists
 
+# PostgreSQL's certificate is self-signed (its own CA). The installer adds it
+# to the trust of its database checks and of every AAP container.
+- name: Give the installer PostgreSQL's certificate as a CA
+  ansible.builtin.copy:
+    src: /var/lib/pgsql/data/server.crt
+    dest: "{{ aap_home }}/postgresql-ca.crt"
+    remote_src: true
+    owner: "{{ aap_user }}"
+    group: "{{ aap_user }}"
+    mode: "0644"
+  register: aap_pg_ca
+
 - name: Write the installer's inventory
   ansible.builtin.template:
     src: inventory.yml.j2
@@ -113,4 +125,5 @@
 - name: Install AAP
   ansible.builtin.import_tasks: install.yml
   when: >-
-    aap_inventory.changed or aap_archive.changed or aap_ping.status | default(-1) != 200
+    aap_inventory.changed or aap_archive.changed or aap_pg_ca.changed
+    or aap_ping.status | default(-1) != 200
