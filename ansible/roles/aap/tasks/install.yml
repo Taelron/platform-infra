@@ -8,10 +8,9 @@
   block:
     - name: Give sudo for the install to {{ aap_user }}
       ansible.builtin.copy:
-        content: >-
-          {{ aap_user }} ALL=(ALL)
-          NOTAFTER={{ '%Y%m%d%H%M%SZ' | strftime(second=(now(utc=true).timestamp() | int) + 7200, utc=true) }}
-          NOPASSWD: ALL{{ '\n' }}
+        # One line, ending in a newline, as visudo requires.
+        content: |
+          {{ aap_user }} ALL=(ALL) NOTAFTER={{ '%Y%m%d%H%M%SZ' | strftime(second=(now(utc=true).timestamp() | int) + 7200, utc=true) }} NOPASSWD: ALL
         dest: /etc/sudoers.d/aap-install
         owner: root
         group: root
