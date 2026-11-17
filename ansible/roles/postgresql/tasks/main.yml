@@ -1,9 +1,9 @@
 ---
-- name: Read the role passwords from pass
+- name: Read the role passwords from SSM
   ansible.builtin.set_fact:
     postgresql_passwords: >-
       {{ (postgresql_passwords | default({}))
-         | combine({item.name: lookup('community.general.passwordstore', 'taelron/platform/postgresql/' ~ item.name)}) }}
+         | combine({item.name: lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/postgresql/' ~ item.name, region=core_secrets_region)}) }}
   loop: "{{ postgresql_databases + postgresql_reader_roles }}"
   loop_control:
     label: "{{ item.name }}"

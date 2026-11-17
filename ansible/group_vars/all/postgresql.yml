@@ -4,8 +4,7 @@ postgresql_stream: "15"
 # One database and one role of the same name per consumer, each reachable
 # only from where that consumer runs. Host consumers (k3s, AAP) connect from
 # a host address on br-mgmt; the clusters from their VM, over TLS. Passwords
-# are read at run time: pass taelron/platform/postgresql/<name> on the RHEL
-# box, AAP credentials later.
+# are read at run time from SSM (secrets.yml): postgresql/<name>.
 postgresql_host_sources: ["{{ bridges[0].prefix }}.0/24"]
 postgresql_databases:
   - { name: k3s, from: "{{ postgresql_host_sources }}" }
@@ -26,7 +25,7 @@ postgresql_databases:
 
 # Roles that own no database and only connect to another consumer's: AAP 2.7's
 # metrics service reads the controller's tables, and EDA's event streams use
-# their own role. Passwords in pass under the same path as the databases'.
+# their own role. Passwords in SSM under the same path as the databases'.
 postgresql_reader_roles:
   - name: ms_awx_readonly
     database: aap_controller

@@ -55,9 +55,8 @@ new SSH connection gets through.
 
 `bind`: BIND 9.18 on each bridge's `.1` and `127.0.0.1`, never on `eth0`. It
 holds `int.taelron.com`; each cluster's ExternalDNS updates only names under
-`<cluster>.int.taelron.com`, with its own TSIG key. The keys are in `pass`
-(`taelron/platform/bind/<cluster>`) and read at run time; AAP passes
-`bind_update_keys` from its credentials. The zone file is written once only,
+`<cluster>.int.taelron.com`, with its own TSIG key. The keys are in SSM
+(`/taelron/core/bind/<cluster>`) and read at run time. The zone file is written once only,
 since named keeps the records ExternalDNS adds. Every other name is forwarded
 to the AWS resolver, without DNSSEC validation (the AWS resolver returns no
 signatures); `rancher.mgmt.taelron.com` answers Rancher's host address.
@@ -66,8 +65,8 @@ signatures); `rancher.mgmt.taelron.com` answers Rancher's host address.
 `127.0.0.1`. One database and one role of the same name per consumer
 (`postgresql_databases`), each allowed only from where it runs: host
 consumers from br-mgmt, the clusters from their VM over TLS (self-signed
-until OpenBao issues it). Passwords are in `pass`
-(`taelron/platform/postgresql/<name>`), set when a role is created. WAL is
+until OpenBao issues it). Passwords are in SSM
+(`/taelron/core/postgresql/<name>`), set when a role is created. WAL is
 archived to S3 with pgBackRest (bucket `platform-pgbackrest-…`, instance role,
 no key), from the moment the stanza exists (before that `archive_command` is
 empty, so a shutdown never waits on a failing push); full backup weekly, differential daily, both run after the next boot
@@ -82,7 +81,7 @@ read-only root filesystem and no capabilities; its files carry the SELinux
 type `container_file_t`. The admin API listens on `127.0.0.1:3903` only; the
 role sets up the layout, one bucket and one key per consumer (read and write
 on its own bucket only) through it, so no secret appears on a command line.
-Secrets and keys are in `pass` (`taelron/platform/garage/…`).
+Secrets and keys are in SSM (`/taelron/core/garage/…`).
 
 `haproxy`: HAProxy on `10.20.1.10:443` for the load balancer, which ends TLS
 with ACM and re-encrypts to HAProxy's self-signed certificate. Each public name
@@ -110,7 +109,9 @@ the host network on `127.0.0.1:8443` only; HAProxy sends Rancher's name and
 the Rancher agents there. cert-manager and Rancher Manager are Helm charts
 that k3s applies from `/var/lib/rancher/k3s/server/manifests`. Rancher has its
 own certificate authority. The k3s token, the database password and Rancher's
-first admin password (break-glass) are in `pass`; on the host they are in
+first admin password (break-glass) are in SSM (`/taelron/core/k3s/token`,
+`/taelron/core/postgresql/k3s`, `/taelron/core/rancher/admin-password`); on
+the host they are in
 root-only files (`/etc/rancher/k3s/config.yaml`, the Rancher manifest).
 
 `aap`: AAP 2.7, containerized, growth topology (every component on the host:
@@ -123,9 +124,10 @@ box; set `aap_installer_file` and `aap_installer_sha256` in
 The user has passwordless sudo only while the installer runs. The installer
 runs again only when its inventory or archive changes, or when the gateway
 does not answer. Envoy, AAP's entry, is on 9443 for HAProxy; no AAP listener
-has a bind address, so nftables keeps the rest out. Secrets in `pass`: the
-admin passwords (`taelron/platform/aap/`), the database passwords, the
-Registry Service Account (`taelron/redhat/registry`: username, then token).
+has a bind address, so nftables keeps the rest out. Secrets in SSM: the
+admin passwords (`/taelron/core/aap/`) and the database passwords. The
+Registry Service Account is a person's credential and stays in `pass`
+(`taelron/redhat/registry`: username, then token).
 The install takes no subscription manifest: once AAP answers, Gaetan activates
 the subscription once in the AAP UI by signing in to Red Hat. Job templates
 run only after that.
@@ -181,8 +183,15 @@ request. The first real run waits for Gaetan's go.
 
 ## Core secrets in SSM
 
-The core layer's secrets move from `pass` to AWS SSM Parameter Store
-(Platform Design Decisions 30). `playbooks/secrets_to_ssm.yml` copies every
+The core layer's secrets are SecureString parameters in AWS SSM Parameter
+Store under `/taelron/core/` (Platform Design Decisions 30), named in
+`group_vars/all/secrets.yml`. The roles read them with the
+`amazon.aws.ssm_parameter` lookup: from a person's box with their Identity
+Center session (`AWS_PROFILE=platform`), from AAP with the host's instance
+role, which may read only that path. Only Gaetan writes them. A person's own
+credentials (the SSH passphrase, the Red Hat registry account) stay in `pass`.
+
+They came from `pass`: `playbooks/secrets_to_ssm.yml` copies every
 entry under `taelron/platform/` in `pass` to a SecureString with the same
 relative name under `/taelron/core/` (for example `taelron/platform/k3s/token`
 becomes `/taelron/core/k3s/token`), then reads each one back and checks it

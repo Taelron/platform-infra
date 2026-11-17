@@ -11,6 +11,6 @@ garage_s3_region: garage
 garage_capacity_bytes: 90000000000
 
 # One bucket and one key per consumer, read and write on its own bucket only.
-# Secrets in pass: taelron/platform/garage/{rpc-secret,admin-token,
+# Secrets in SSM (secrets.yml): garage/{rpc-secret,admin-token,
 # metrics-token,<bucket>-key-id,<bucket>-key-secret}.
 garage_buckets: [mimir, loki, tempo]
