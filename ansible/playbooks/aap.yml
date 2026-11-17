@@ -1,0 +1,8 @@
+---
+# From the RHEL box only, never as an AAP job: AAP does not install itself.
+# Not in site.yml for the same reason.
+- name: AAP
+  hosts: host
+  roles:
+    - role: aap
+      tags: [aap]

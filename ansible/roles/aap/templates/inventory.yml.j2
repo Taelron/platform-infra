@@ -1,0 +1,68 @@
+# {{ ansible_managed }}
+# AAP's installer inventory: growth topology, every component on this host,
+# on the shared PostgreSQL (no [database] group). Holds secrets: mode 0600,
+# owned by {{ aap_user }}, who runs the containers that hold them anyway.
+{% set fqdn = ansible_facts['fqdn'] %}
+{% set pg = postgresql_address %}
+{% set s = aap_secrets %}
+all:
+  children:
+{% for group in ['automationgateway', 'automationcontroller', 'automationhub', 'automationeda', 'automationmetrics'] %}
+    {{ group }}:
+      hosts:
+        {{ fqdn }}: {}
+{% endfor %}
+  vars:
+    ansible_connection: local
+    registry_username: {{ s.registry_username | to_json }}
+    registry_password: {{ s.registry_password | to_json }}
+    redis_mode: standalone
+
+    gateway_main_url: "https://{{ aap_hostname }}"
+    gateway_admin_password: {{ s.gateway_admin | to_json }}
+    gateway_pg_host: {{ pg }}
+    gateway_pg_database: aap_gateway
+    gateway_pg_username: aap_gateway
+    gateway_pg_password: {{ s.gateway_pg | to_json }}
+    gateway_pg_sslmode: require
+
+    controller_admin_password: {{ s.controller_admin | to_json }}
+    controller_pg_host: {{ pg }}
+    controller_pg_database: aap_controller
+    controller_pg_username: aap_controller
+    controller_pg_password: {{ s.controller_pg | to_json }}
+    controller_pg_sslmode: require
+    controller_percent_memory_capacity: 0.5
+
+    hub_admin_password: {{ s.hub_admin | to_json }}
+    hub_pg_host: {{ pg }}
+    hub_pg_database: aap_hub
+    hub_pg_username: aap_hub
+    hub_pg_password: {{ s.hub_pg | to_json }}
+    hub_pg_sslmode: require
+    hub_seed_collections: false
+
+    eda_admin_password: {{ s.eda_admin | to_json }}
+    eda_pg_host: {{ pg }}
+    eda_pg_database: aap_eda
+    eda_pg_username: aap_eda
+    eda_pg_password: {{ s.eda_pg | to_json }}
+    eda_pg_sslmode: require
+    eda_event_stream_pg_username: eda_event_stream
+    eda_event_stream_pg_password: {{ s.event_stream_pg | to_json }}
+    eda_event_stream_pg_sslmode: require
+
+    automationmetrics_pg_host: {{ pg }}
+    automationmetrics_pg_database: aap_metrics
+    automationmetrics_pg_username: aap_metrics
+    automationmetrics_pg_password: {{ s.metrics_pg | to_json }}
+    automationmetrics_pg_sslmode: require
+    automationmetrics_controller_read_pg_host: {{ pg }}
+    automationmetrics_controller_read_pg_database: aap_controller
+    automationmetrics_controller_read_pg_username: ms_awx_readonly
+    automationmetrics_controller_read_pg_password: {{ s.metrics_reader_pg | to_json }}
+    automationmetrics_controller_read_pg_sslmode: require
+
+{% for k, v in aap_ports.items() %}
+    {{ k }}: {{ v }}
+{% endfor %}

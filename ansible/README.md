@@ -34,6 +34,7 @@ inventory.
 | `alloy`   | host metrics and logs (sends from Phase 5)           |
 | `kvm`     | KVM and libvirt, no NAT network                      |
 | `k3s_rancher` | mgmt cluster: k3s, Traefik, Rancher Manager       |
+| `aap`     | AAP 2.7 containerized, RHEL box only                 |
 
 `disks`: each volume is found by its EBS volume ID
 (`/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol…`), never by `nvme<n>`.
@@ -109,6 +110,23 @@ that k3s applies from `/var/lib/rancher/k3s/server/manifests`. Rancher has its
 own certificate authority. The k3s token, the database password and Rancher's
 first admin password (break-glass) are in `pass`; on the host they are in
 root-only files (`/etc/rancher/k3s/config.yaml`, the Rancher manifest).
+
+`aap`: AAP 2.7, containerized, growth topology (every component on the host:
+gateway, controller, hub, EDA, metrics service), on the shared PostgreSQL. It
+runs from the RHEL box only, never as an AAP job, and is not in `site.yml`.
+The online installer is downloaded from Red Hat to `~/Downloads` on the RHEL
+box; set `aap_installer_file` and `aap_installer_sha256` in
+`group_vars/all/aap.yml`. AAP runs rootless as user `aap`, home
+`/var/lib/aap/aap` on the AAP volume (labelled like `/home`), with linger.
+The user has passwordless sudo only while the installer runs. The installer
+runs again only when its inventory or archive changes, or when the gateway
+does not answer. Envoy, AAP's entry, is on 9443 for HAProxy; no AAP listener
+has a bind address, so nftables keeps the rest out. Secrets in `pass`: the
+admin passwords (`taelron/platform/aap/`), the database passwords, the
+Registry Service Account (`taelron/redhat/registry`: username, then token).
+The install takes no subscription manifest: once AAP answers, Gaetan activates
+the subscription once in the AAP UI by signing in to Red Hat. Job templates
+run only after that.
 
 `base` details: it checks that RHEL is registered; keeps SELinux enforcing;
 masks firewalld (nftables manages the firewall); allows SSH by key only, no

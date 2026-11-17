@@ -4,7 +4,7 @@
     postgresql_passwords: >-
       {{ (postgresql_passwords | default({}))
          | combine({item.name: lookup('community.general.passwordstore', 'taelron/platform/postgresql/' ~ item.name)}) }}
-  loop: "{{ postgresql_databases }}"
+  loop: "{{ postgresql_databases + postgresql_reader_roles }}"
   loop_control:
     label: "{{ item.name }}"
   when: postgresql_passwords is not defined or item.name not in postgresql_passwords

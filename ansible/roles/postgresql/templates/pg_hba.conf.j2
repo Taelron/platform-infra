@@ -3,13 +3,14 @@
 # The postgres superuser only through the local socket, as the postgres user.
 local     all       postgres            peer
 
-{% for d in postgresql_databases %}
+{% for d in postgresql_databases + postgresql_reader_roles %}
+{% set db = d.database | default(d.name) %}
 # {{ d.name }}
 {% for src in d.from %}
 {% if src in postgresql_host_sources %}
-host      {{ d.name }}  {{ d.name }}  {{ src }}  scram-sha-256
+host      {{ db }}  {{ d.name }}  {{ src }}  scram-sha-256
 {% else %}
-hostssl   {{ d.name }}  {{ d.name }}  {{ src }}  scram-sha-256
+hostssl   {{ db }}  {{ d.name }}  {{ src }}  scram-sha-256
 {% endif %}
 {% endfor %}
 {% endfor %}

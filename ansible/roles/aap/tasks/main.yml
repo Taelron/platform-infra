@@ -1,0 +1,116 @@
+---
+- name: Check that the installer is named
+  ansible.builtin.assert:
+    that:
+      - aap_installer_file | length > 0
+      - aap_installer_sha256 | length == 64
+    fail_msg: Set aap_installer_file and aap_installer_sha256 in group_vars/all/aap.yml.
+    quiet: true
+
+- name: Remove any sudo left over from an install that was cut off
+  ansible.builtin.file:
+    path: /etc/sudoers.d/aap-install
+    state: absent
+
+- name: Read AAP's secrets from pass
+  ansible.builtin.set_fact:
+    aap_secrets: >-
+      {{ (aap_secrets | default({})) | combine({item.key: lookup('community.general.passwordstore', item.value)}) }}
+  loop: "{{ aap_pass_entries | dict2items }}"
+  no_log: true
+
+- name: Read the Registry Service Account from pass
+  ansible.builtin.set_fact:
+    aap_secrets: >-
+      {{ aap_secrets | combine({
+           'registry_username': registry[0],
+           'registry_password': registry[1]}) }}
+  vars:
+    registry: "{{ lookup('community.general.passwordstore', 'taelron/redhat/registry', returnall=true).splitlines() }}"
+  no_log: true
+
+- name: Install what the installer needs
+  ansible.builtin.dnf:
+    name: [ansible-core, python3-requests]
+    state: present
+
+# Container storage under a home outside /home needs /home's labels.
+- name: Label the AAP volume like /home
+  ansible.builtin.command: semanage fcontext -a -e /home /var/lib/aap
+  register: aap_fcontext
+  changed_when: aap_fcontext.rc == 0
+  failed_when: aap_fcontext.rc != 0 and 'already defined' not in aap_fcontext.stderr
+  notify: Relabel the AAP volume
+
+- name: Create user {{ aap_user }}
+  ansible.builtin.user:
+    name: "{{ aap_user }}"
+    home: "{{ aap_home }}"
+    shell: /bin/bash
+    comment: AAP containers
+  register: aap_account
+  notify: Relabel the AAP volume
+
+- name: Relabel before the containers write there
+  ansible.builtin.meta: flush_handlers
+
+# Its containers run as user services, which need a running user manager.
+- name: Keep the user manager running for {{ aap_user }}
+  ansible.builtin.command: loginctl enable-linger {{ aap_user }}
+  args:
+    creates: /var/lib/systemd/linger/{{ aap_user }}
+
+- name: Copy the installer
+  ansible.builtin.copy:
+    src: "{{ aap_installer_src }}"
+    dest: "{{ aap_home }}/{{ aap_installer_file }}"
+    owner: "{{ aap_user }}"
+    group: "{{ aap_user }}"
+    mode: "0600"
+  register: aap_archive
+
+- name: Read the installer's checksum
+  ansible.builtin.stat:
+    path: "{{ aap_home }}/{{ aap_installer_file }}"
+    checksum_algorithm: sha256
+  register: aap_archive_stat
+
+- name: Check the installer against its checksum
+  ansible.builtin.assert:
+    that: ansible_check_mode or aap_archive_stat.stat.checksum | default('') == aap_installer_sha256
+    fail_msg: "{{ aap_installer_file }} does not match aap_installer_sha256."
+    quiet: true
+
+- name: Unpack the installer
+  ansible.builtin.unarchive:
+    src: "{{ aap_home }}/{{ aap_installer_file }}"
+    dest: "{{ aap_home }}"
+    remote_src: true
+    owner: "{{ aap_user }}"
+    group: "{{ aap_user }}"
+    creates: "{{ aap_installer_dir }}"
+  when: not ansible_check_mode or aap_archive_stat.stat.exists
+
+- name: Write the installer's inventory
+  ansible.builtin.template:
+    src: inventory.yml.j2
+    dest: "{{ aap_installer_dir }}/inventory-taelron.yml"
+    owner: "{{ aap_user }}"
+    group: "{{ aap_user }}"
+    mode: "0600"
+  register: aap_inventory
+  no_log: true
+  when: not ansible_check_mode or aap_archive_stat.stat.exists
+
+- name: Ask the gateway whether AAP runs
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:{{ aap_ports.envoy_https_port }}/api/gateway/v1/ping/"
+    validate_certs: false
+  register: aap_ping
+  failed_when: false
+  check_mode: false
+
+- name: Install AAP
+  ansible.builtin.import_tasks: install.yml
+  when: >-
+    aap_inventory.changed or aap_archive.changed or aap_ping.status | default(-1) != 200

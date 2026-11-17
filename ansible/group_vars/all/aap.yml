@@ -1,0 +1,42 @@
+# AAP 2.7, containerized, growth topology (all-in-one) on the host, on the
+# shared PostgreSQL (Platform Design Decisions 17; TAE-138, "Step 8 check").
+
+# The online installer, downloaded from Red Hat to the RHEL box (not in Git).
+# The role copies it to the host and checks it against this checksum.
+aap_installer_file: ansible-automation-platform-containerized-setup-2.7-1.tar.gz
+aap_installer_sha256: 1034fcaa0e157908a865f18b4a97c7e8e9d03fb3944aec26e0f9fb6ec4aa2816
+aap_installer_src: "{{ lookup('ansible.builtin.env', 'HOME') }}/Downloads/{{ aap_installer_file }}"
+
+# AAP runs rootless as this user; its home, on the AAP volume, holds the
+# container storage and AAP's data.
+aap_user: aap
+aap_home: /var/lib/aap/aap
+
+aap_hostname: aap.shared.taelron.com
+
+# No listener has a bind address: each takes every host address. Envoy is
+# the public entry, reached by HAProxy on {{ aap_address }}:9443 (flow 2).
+# The others avoid 443 and 8443 (HAProxy, Traefik) and Traefik's 8080.
+aap_ports:
+  envoy_https_port: 9443
+  envoy_http_port: 9080
+  gateway_nginx_https_port: 8446
+  gateway_nginx_http_port: 8083
+  controller_nginx_https_port: 8451
+  controller_nginx_http_port: 8089
+  hub_nginx_https_port: 8444
+  hub_nginx_http_port: 8081
+  eda_nginx_https_port: 8445
+  eda_nginx_http_port: 8082
+  automationmetrics_nginx_https_port: 8450
+  automationmetrics_nginx_http_port: 8087
+  automationmetrics_api_port: 8006
+  gateway_redis_port: 6379
+  receptor_port: 27199
+
+# Secrets, read at run time from pass: the admin passwords
+# (taelron/platform/aap/{admin-password,controller-admin-password,
+# hub-admin-password,eda-admin-password}), the database passwords
+# (taelron/platform/postgresql/<role>) and the Registry Service Account
+# (taelron/redhat/registry: username, then token). No subscription manifest:
+# the subscription is activated after the install, in the AAP UI.

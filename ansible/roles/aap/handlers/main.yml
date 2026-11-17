@@ -1,0 +1,4 @@
+---
+- name: Relabel the AAP volume
+  ansible.builtin.command: restorecon -R /var/lib/aap
+  changed_when: true
