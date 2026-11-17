@@ -63,6 +63,8 @@ aap_config_project_branch: main
 aap_config_inventory: platform
 aap_config_machine_credential: platform-aws-01
 aap_config_registry_credential: registry.redhat.io
+# Created by AAP's installer; lets the project sync install collections.
+aap_config_galaxy_credential: Ansible Galaxy
 # The execution environment, pinned by digest (ee-supported-rhel9, AAP 2.7).
 aap_config_ee_name: Taelron EE
 aap_config_ee_image: >-
