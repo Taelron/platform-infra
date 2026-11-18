@@ -8,8 +8,8 @@ The GitHub settings the platform relies on, in the organisation `Taelron`:
   repository, bypass list empty (Versioning and Releases, pattern 7):
   - `default-branch`: no force push, no deletion, on every repository;
   - `default-branch-review`: pull request with 1 approval, stale approvals
-    dismissed, the last push approved by someone other than its author, squash
-    only; every repository except `taelron-docs-site`, where pages are
+    dismissed, the last push approved by someone other than its author, code
+    owner review (each repository's `CODEOWNERS` names the PO), squash only; every repository except `taelron-docs-site`, where pages are
     published to `main` directly;
 - squash merge only on both, the pull request title as the commit;
 - the environment `aws-apply` on `platform-infra`: deployments from `main` only,
