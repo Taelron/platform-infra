@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0](https://github.com/Taelron/platform-infra/compare/toolchain-v1.0.0...toolchain-v1.1.0) (2026-11-18)
+
+
+### Features
+
+* **core:** aap project and job templates (Part of TAE-138) ([#65](https://github.com/Taelron/platform-infra/issues/65)) ([b61df7d](https://github.com/Taelron/platform-infra/commit/b61df7daa4be00c313236962661e2a32f5b71746))
+* **core:** ansible skeleton and base role (Part of TAE-138) ([#34](https://github.com/Taelron/platform-infra/issues/34)) ([9d800e0](https://github.com/Taelron/platform-infra/commit/9d800e03c688ff3226afacfe8f91ed4921d58df7))
+* **core:** copy core secrets from pass to ssm (Part of TAE-138) ([#63](https://github.com/Taelron/platform-infra/issues/63)) ([02cecdb](https://github.com/Taelron/platform-infra/commit/02cecdbae8f1a9aab86c477720eb021b53f72bfe))
+* **toolchain:** organization rulesets protect every default branch (Part of TAE-165) ([#68](https://github.com/Taelron/platform-infra/issues/68)) ([bf830c7](https://github.com/Taelron/platform-infra/commit/bf830c72b324a8ac322a576d0a5f2f077f27bc4c))
+
 ## 1.0.0 (2026-11-14)
 
 
