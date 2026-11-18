@@ -1,7 +1,9 @@
 # GitHub Actions in platform-infra: the workflow token is read-only by default
 # (each workflow asks for what it needs), and Actions may open pull requests,
-# which release-please needs for its release pull requests. Approving them
-# changes nothing here: the main ruleset requires no approval, Gaetan merges.
+# which release-please needs for its release pull requests. GitHub grants the
+# right to approve pull requests with the same setting, and an approval by a
+# workflow counts for the organization rulesets (rulesets.tf): open point on
+# TAE-165.
 
 import {
   to = github_workflow_repository_permissions.platform_infra

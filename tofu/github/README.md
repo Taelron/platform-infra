@@ -4,8 +4,13 @@ The GitHub settings the platform relies on, in the organisation `Taelron`:
 
 - the repositories `platform-infra` and `platform-gitops`: public, secret
   scanning and push protection on, `prevent_destroy`;
-- the ruleset `main` on each: pull request required, no force push, no
-  deletion;
+- two organisation rulesets on the default branch of every Taelron
+  repository, bypass list empty (Versioning and Releases, pattern 7):
+  - `default-branch`: no force push, no deletion, on every repository;
+  - `default-branch-review`: pull request with 1 approval, stale approvals
+    dismissed, the last push approved by someone other than its author, squash
+    only; every repository except `taelron-docs-site`, where pages are
+    published to `main` directly;
 - squash merge only on both, the pull request title as the commit;
 - the environment `aws-apply` on `platform-infra`: deployments from `main` only,
   approved by Gaetan, admins cannot bypass it. The apply role in AWS trusts only
@@ -31,8 +36,10 @@ The provider has no resource for these; set by hand, check after any change:
 ## Apply
 
 Signs in as the GitHub App `taelron-platform-admin` (Taelron organisation,
-installed on the two repositories only; Administration, Environments and Secret
-scanning alerts in write, Metadata in read). Its private key is in `pass`.
+installed on the two repositories only; Organization administration,
+Administration, Environments and Secret scanning alerts in write, Metadata in
+read). Organization administration covers the organisation rulesets. Its
+private key is in `pass`.
 
 ```sh
 export AWS_PROFILE=platform
