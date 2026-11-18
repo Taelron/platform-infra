@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/Taelron/platform-infra/compare/foundation-v1.0.0...foundation-v1.1.0) (2026-11-18)
+
+
+### Features
+
+* **foundation:** host reads only /taelron/core in SSM (Part of TAE-138) ([#61](https://github.com/Taelron/platform-infra/issues/61)) ([20c7aa3](https://github.com/Taelron/platform-infra/commit/20c7aa3ae23576c590004573388cf2c1eb7fdcaa))
+
 ## 1.0.0 (2026-11-14)
 
 
