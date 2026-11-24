@@ -5,7 +5,7 @@ The GitHub settings the platform relies on, in the organisation `Taelron`:
 - the repositories `platform-infra` and `platform-gitops`: public, secret
   scanning and push protection on, `prevent_destroy`;
 - two organisation rulesets on the default branch of every Taelron
-  repository, bypass list empty (Versioning and Releases, pattern 7):
+  repository, bypass list empty (Versioning and Releases, pattern 10):
   - `default-branch`: no force push, no deletion, on every repository;
   - `default-branch-review`: pull request with 1 approval, stale approvals
     dismissed, the last push approved by someone other than its author, code

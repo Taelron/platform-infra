@@ -1,4 +1,4 @@
-# Protected default branch (Versioning and Releases, pattern 7): organization
+# Protected default branch (Versioning and Releases, pattern 10): organization
 # rulesets on the default branch of every Taelron repository, with an empty
 # bypass list. The PO approves and squash-merges; no agent approves or merges.
 #
@@ -13,7 +13,7 @@
 # force pushes and deletion.
 
 locals {
-  # Excluded from the pull request rule, each with its reason in pattern 7.
+  # Excluded from the pull request rule, each with its reason in pattern 10.
   review_excluded_repositories = ["taelron-docs-site"]
 }
 
