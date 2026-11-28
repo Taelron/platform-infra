@@ -39,11 +39,12 @@
     cmd: /usr/local/bin/k3s kubectl apply -f -
     stdin: "{{ secret | to_json }}"
   vars:
-    # One line per key: "<address> <type> <key>".
-    known_hosts: >-
-      {{ (k3s_rancher_host_keys.results | map(attribute='content') | map('b64decode')
-          | map('regex_replace', '^(\\S+) (\\S+).*\\s*$', host_vpc_address ~ ' \\1 \\2')
-          | join('\n')) ~ '\n' }}
+    # One line per key: "<address> <type> <key>". A literal block and a plain
+    # loop: no regex or escaped newline to get wrong.
+    known_hosts: |
+      {% for k in k3s_rancher_host_keys.results %}
+      {{ host_vpc_address }} {{ (k.content | b64decode).split()[0] }} {{ (k.content | b64decode).split()[1] }}
+      {% endfor %}
     secret:
       apiVersion: v1
       kind: Secret
