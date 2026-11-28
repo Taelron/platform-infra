@@ -13,7 +13,8 @@ k3s_pod_cidr: 10.42.0.0/16
 # addresses of the services that run on the host itself; NetworkManager owns it.
 # The three cluster bridges are libvirt networks (role kvm): CAPLV reads each
 # VM's address from libvirt's DHCP leases (TAE-139, decided 28 November 2026),
-# so libvirt runs DHCP on them, nodes from .50 to .99. libvirt adds no
+# so libvirt runs DHCP on them, nodes from .64 to .127 (one /26, so access
+# lists name the nodes only; .50 to .99 as decided, moved for that). libvirt adds no
 # firewall rule (forward mode open) and no DNS: BIND on .1 stays the resolver.
 bridges:
   - name: br-mgmt
@@ -22,15 +23,15 @@ bridges:
   - name: br-shared
     prefix: 192.168.20
     libvirt: true
-    dhcp: [50, 99]
+    dhcp: [64, 127]
   - name: br-test
     prefix: 192.168.30
     libvirt: true
-    dhcp: [50, 99]
+    dhcp: [64, 127]
   - name: br-demo
     prefix: 192.168.40
     libvirt: true
-    dhcp: [50, 99]
+    dhcp: [64, 127]
 
 # Host addresses on br-mgmt (decision 9).
 postgresql_address: 192.168.10.11
@@ -44,18 +45,21 @@ clusters:
   shared:
     bridge: br-shared
     cidr: 192.168.20.0/24
+    nodes: 192.168.20.64/26
     api: 192.168.20.10
     public_gateway: 192.168.20.200
     internal_gateway: 192.168.20.201
   test:
     bridge: br-test
     cidr: 192.168.30.0/24
+    nodes: 192.168.30.64/26
     api: 192.168.30.10
     public_gateway: 192.168.30.200
     internal_gateway: 192.168.30.201
   demo:
     bridge: br-demo
     cidr: 192.168.40.0/24
+    nodes: 192.168.40.64/26
     api: 192.168.40.10
     public_gateway: 192.168.40.200
     internal_gateway: 192.168.40.201
@@ -152,7 +156,15 @@ nft_flows:
     dport: [22]
 
   # Cluster VMs to the internet through the host's NAT (nft_masquerade):
-  # images, packages (decided 28 November 2026).
+  # images, packages (decided 28 November 2026). Never to the VPC or a
+  # link-local address through it: the drop comes before every accept.
+  - id: 21
+    why: Cluster VMs never reach the VPC or link-local addresses through NAT
+    chain: forward
+    iif: [br-shared, br-test, br-demo]
+    oif: [eth0]
+    daddr: [10.20.0.0/16, 169.254.0.0/16]
+    action: drop
   - id: 21
     why: Cluster VMs to the internet through NAT
     chain: forward

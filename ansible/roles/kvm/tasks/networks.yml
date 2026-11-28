@@ -10,13 +10,25 @@
     enabled: true
   ignore_errors: "{{ ansible_check_mode }}"
 
-- name: Remove the NetworkManager bridge libvirt takes over
-  community.general.nmcli:
-    conn_name: "{{ item.name }}"
-    state: absent
+# Only the profile NetworkManager saved: once libvirt owns a bridge,
+# NetworkManager shows it as an in-memory connection under /run, which must be
+# left alone (deleting it would take libvirt's bridge down).
+- name: Look for a saved NetworkManager profile of each cluster bridge
+  ansible.builtin.stat:
+    path: /etc/NetworkManager/system-connections/{{ item.name }}.nmconnection
   loop: "{{ bridges | selectattr('libvirt', 'defined') }}"
   loop_control:
     label: "{{ item.name }}"
+  register: kvm_nm_profiles
+
+- name: Remove the NetworkManager bridge libvirt takes over
+  community.general.nmcli:
+    conn_name: "{{ item.item.name }}"
+    state: absent
+  loop: "{{ kvm_nm_profiles.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item.stat.exists
   register: kvm_nm_bridges
 
 - name: Write each cluster network's definition

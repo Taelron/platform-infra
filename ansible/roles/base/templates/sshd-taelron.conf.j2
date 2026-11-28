@@ -4,3 +4,8 @@ PermitRootLogin no
 PubkeyAuthentication yes
 PasswordAuthentication no
 KbdInteractiveAuthentication no
+
+# Who may sign in, and from where: the admin and AAP as {{ aap_ssh_user }} (key
+# only, flows 11 and 18), and CAPLV as caplv from the mgmt cluster's pods only
+# (flow 22). Any other user is refused.
+AllowUsers {{ aap_ssh_user }} caplv@{{ k3s_pod_cidr }}
