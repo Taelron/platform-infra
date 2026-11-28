@@ -83,4 +83,5 @@ aap_config_playbooks:
   - alloy
   - kvm
   - k3s_rancher
+  - cluster_apply
   - health

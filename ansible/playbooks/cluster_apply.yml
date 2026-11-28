@@ -1,0 +1,56 @@
+---
+# Applies a cluster's definition from platform-gitops (clusters/<name>/) to the
+# mgmt cluster, at the commit pinned in group_vars (cluster_api.yml). Used once
+# for shared (Platform Design Decisions 6); Argo CD, which runs in shared,
+# applies test and demo and takes shared over.
+#
+#   .venv/bin/ansible-playbook playbooks/cluster_apply.yml -e cluster_apply_name=shared
+#
+# Cluster API then creates the cluster: CAPLV its VM, CAPRKE2 its RKE2.
+- name: Cluster definition to mgmt
+  hosts: host
+  become: true
+  vars:
+    cluster_apply_name: shared
+    cluster_apply_commit: "{{ cluster_apply_definitions[cluster_apply_name] }}"
+    cluster_apply_file: /root/cluster-{{ cluster_apply_name }}-{{ cluster_apply_commit[:12] }}.yaml
+  tasks:
+    - name: Refuse a cluster without a pinned definition
+      ansible.builtin.assert:
+        that: cluster_apply_name in cluster_apply_definitions
+        fail_msg: "{{ cluster_apply_name }} has no pinned commit in cluster_apply_definitions."
+        quiet: true
+
+    - name: Fetch the definition at its pinned commit
+      ansible.builtin.get_url:
+        url: "{{ cluster_apply_repository }}/{{ cluster_apply_commit }}/clusters/{{ cluster_apply_name }}/cluster.yaml"
+        dest: "{{ cluster_apply_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Check it against the cluster's CRDs
+      ansible.builtin.command: /usr/local/bin/k3s kubectl apply --dry-run=server -f {{ cluster_apply_file }}
+      changed_when: false
+      check_mode: false
+      # In check mode the file above is not fetched.
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: Apply it
+      ansible.builtin.command: /usr/local/bin/k3s kubectl apply -f {{ cluster_apply_file }}
+      register: cluster_apply_result
+      changed_when: cluster_apply_result.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+      when: not ansible_check_mode
+
+    - name: Show what Cluster API now builds
+      ansible.builtin.command: >-
+        /usr/local/bin/k3s kubectl -n {{ cluster_apply_name }} get
+        cluster,rke2controlplane,machine,libvirtmachine
+      register: cluster_apply_state
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Print it
+      ansible.builtin.debug:
+        var: cluster_apply_state.stdout_lines
+      when: not ansible_check_mode

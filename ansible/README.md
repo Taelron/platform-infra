@@ -20,6 +20,7 @@ is installed, AAP runs the same playbooks as job templates from GitHub.
 | `playbooks/secrets_to_ssm.yml`| core secrets, `pass` to SSM, RHEL box    |
 | `playbooks/aap_config.yml`    | AAP's configuration, RHEL box            |
 | `playbooks/pgbackrest_restore.yml` | PostgreSQL restore from pgBackRest  |
+| `playbooks/cluster_apply.yml` | a cluster definition to mgmt (once)  |
 
 `inventory/group_vars` links to `group_vars`, so Ansible reads it next to the
 inventory.
