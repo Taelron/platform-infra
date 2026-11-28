@@ -27,6 +27,9 @@ postgresql_databases:
   - { name: keycloak_test, from: ["{{ clusters.test.nodes }}"] }
   - { name: keycloak_demo, from: ["{{ clusters.demo.nodes }}"] }
   - { name: grafana, from: ["{{ clusters.shared.nodes }}"] }
+  # OpenBao in shared keeps its storage here (TAE-139, 28 November 2026):
+  # it survives node replacements and pgBackRest backs it up.
+  - { name: openbao_shared, from: ["{{ clusters.shared.nodes }}"] }
   - { name: fleetdesk_test, from: ["{{ clusters.test.nodes }}"] }
   - { name: fleetdesk_demo, from: ["{{ clusters.demo.nodes }}"] }
 

@@ -85,4 +85,5 @@ aap_config_playbooks:
   - k3s_rancher
   - cluster_apply
   - argocd_bootstrap
+  - cluster_secrets
   - health
