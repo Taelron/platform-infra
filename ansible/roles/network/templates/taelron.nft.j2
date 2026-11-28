@@ -67,6 +67,10 @@ table inet taelron {
   chain output {
     # Flows 2, 3, 8, 12, 13, 14: traffic from the host itself.
     type filter hook output priority filter; policy accept;
+{% for u in nft_deny_users | default([]) %}
+    # {{ u }} opens no IP connection (its inbound SSH session is established).
+    meta skuid "{{ u }}" ct state new drop
+{% endfor %}
   }
 
   chain postrouting {

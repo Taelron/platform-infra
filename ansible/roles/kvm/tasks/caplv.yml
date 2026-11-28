@@ -41,6 +41,32 @@
 
 # At the end of sshd_config: a Match block ends only at the next Match or at
 # the end of the file, so it cannot sit in a drop-in read first.
+# AllowTcpForwarding local: OpenSSH checks a forwarded Unix socket against the
+# same permission as a local TCP forward ("Received request to connect to
+# path ..., but the request was denied" with "no"). The firewall then drops
+# every new IP connection opened as caplv (role network, nft_deny_users), so
+# the libvirt socket stays the only thing it can reach.
+# Fail closed: sshd lets caplv forward TCP only once the firewall drops every
+# IP connection caplv would open (role network runs first).
+- name: Read the firewall's output chain
+  ansible.builtin.command: nft list chain inet taelron output
+  register: kvm_nft_output
+  changed_when: false
+  check_mode: false
+
+- name: Read caplv's user ID (nft may list the rule by number)
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ kvm_caplv_user }}"
+
+- name: Refuse to open sshd for caplv before the firewall holds it
+  ansible.builtin.assert:
+    that: >-
+      kvm_nft_output.stdout is search('skuid ("?' ~ kvm_caplv_user ~ '"?|'
+      ~ ansible_facts.getent_passwd[kvm_caplv_user][1] ~ ') ct state new drop')
+    fail_msg: The nftables rule for {{ kvm_caplv_user }} is not loaded; run role network first.
+    quiet: true
+
 - name: Let CAPLV forward local Unix sockets only, and nothing else
   ansible.builtin.blockinfile:
     path: /etc/ssh/sshd_config
@@ -49,7 +75,7 @@
     block: |
       Match User {{ kvm_caplv_user }}
           AllowStreamLocalForwarding local
-          AllowTcpForwarding no
+          AllowTcpForwarding local
           AllowAgentForwarding no
           X11Forwarding no
           PermitTTY no

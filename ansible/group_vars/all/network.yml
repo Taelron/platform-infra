@@ -214,6 +214,11 @@ nft_flows:
     proto: tcp
     dport: [22]
 
+# Users that may open no IP connection from the host (output chain). caplv
+# must forward TCP in sshd for its Unix socket forward to be allowed; this
+# drops any connection it would open over IP (role kvm, caplv.yml).
+nft_deny_users: [caplv]
+
 # Source NAT to the VPC address for the flows that leave by eth0 from a
 # cluster bridge (flow 21). The k3s pods' NAT is k3s's own.
 nft_masquerade:
