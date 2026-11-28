@@ -1,0 +1,369 @@
+---
+# OpenBao in a cluster: initialised once, then configured (TAE-139; Platform
+# Design Decisions 5, 18, 22). From the RHEL box only, with a person's
+# Identity Center session: it writes the root token and the recovery key to
+# SSM, which the host's instance role may not.
+#
+#   AWS_PROFILE=platform .venv/bin/ansible-playbook playbooks/openbao_init.yml --check
+#   AWS_PROFILE=platform .venv/bin/ansible-playbook playbooks/openbao_init.yml
+#
+# 1. If OpenBao is not initialised: `bao operator init` with one recovery key
+#    (the static seal unseals it by itself); the root token and the recovery
+#    key into SSM openbao/{root-token,recovery-key}-<cluster>, read back.
+#    The write rights are proven before init, so nothing is lost.
+# 2. The mounts and auth methods of group_vars/all/openbao.yml, when missing.
+# 3. The internal CA: a root in pki/ and an intermediate in pki_int/ signed by
+#    it, each generated only while its mount has no issuer.
+# 4. openbao_config: each path read, and written when a field differs.
+# 5. Bootstrap secrets into KV: the Garage keys, ExternalDNS's BIND key, and
+#    Argo CD's break-glass password, after which argocd-initial-admin-secret
+#    is deleted.
+#
+# The root token reaches bao on stdin, never in argv, a file or the log.
+- name: OpenBao, initialised and configured
+  hosts: host
+  become: true
+  vars:
+    openbao_cluster: shared
+    openbao_kubeconfig: /root/kubeconfig-openbao-{{ openbao_cluster }}
+    openbao_ssm_root_token: "{{ core_secrets_prefix }}/openbao/root-token-{{ openbao_cluster }}"
+    openbao_ssm_recovery_key: "{{ core_secrets_prefix }}/openbao/recovery-key-{{ openbao_cluster }}"
+    openbao_ssm_tags:
+      Project: taelron-platform
+      ManagedBy: ansible
+      Repository: platform-infra
+    openbao_kubectl: [/usr/local/bin/k3s, kubectl, --kubeconfig, "{{ openbao_kubeconfig }}"]
+    # bao in OpenBao's pod: without a token, and with the root token read
+    # from the first line of stdin (the rest of stdin goes to bao).
+    openbao_bao: "{{ openbao_kubectl + ['-n', 'openbao', 'exec', 'openbao-0', '--', 'bao'] }}"
+    openbao_bao_auth: >-
+      {{ openbao_kubectl + ['-n', 'openbao', 'exec', '-i', 'openbao-0', '--',
+         'sh', '-c', 'read -r BAO_TOKEN; export BAO_TOKEN; exec bao "$@"', 'bao'] }}
+  tasks:
+    - name: Refuse a cluster that is not listed
+      ansible.builtin.assert:
+        that: openbao_cluster in cluster_secrets_clusters
+        quiet: true
+
+    - name: Read who runs this
+      amazon.aws.aws_caller_info:
+        region: "{{ core_secrets_region }}"
+      delegate_to: localhost
+      become: false
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+      check_mode: false
+      register: openbao_caller
+
+    - name: Refuse any identity but a person's Identity Center session
+      ansible.builtin.assert:
+        that: "':assumed-role/AWSReservedSSO_' in openbao_caller.arn"
+        fail_msg: Run from the RHEL box with AWS_PROFILE=platform; the instance role cannot write to SSM.
+        quiet: true
+
+    - name: OpenBao, with the cluster's kubeconfig
+      block:
+        - name: Write the cluster's kubeconfig from mgmt
+          ansible.builtin.shell: >-
+            set -o pipefail;
+            /usr/local/bin/k3s kubectl -n {{ openbao_cluster }} get secret {{ openbao_cluster }}-kubeconfig
+            -o jsonpath='{.data.value}' | base64 -d > {{ openbao_kubeconfig }}
+            && chmod 0600 {{ openbao_kubeconfig }}
+          args:
+            executable: /bin/bash
+          changed_when: false
+          check_mode: false
+          no_log: true
+
+        - name: Read OpenBao's status
+          ansible.builtin.command:
+            argv: "{{ openbao_bao + ['status', '-format=json'] }}"
+          register: openbao_status_raw
+          changed_when: false
+          # 2: sealed, which it is before init.
+          failed_when: openbao_status_raw.rc not in [0, 2]
+          check_mode: false
+
+        - name: Keep the status
+          ansible.builtin.set_fact:
+            openbao_status: "{{ openbao_status_raw.stdout | from_json }}"
+
+        - name: Initialise OpenBao, once
+          when: not openbao_status.initialized
+          block:
+            - name: Prove the SSM parameters can be written, before init
+              community.aws.ssm_parameter:
+                name: "{{ item }}"
+                value: pending-init
+                string_type: SecureString
+                region: "{{ core_secrets_region }}"
+                tags: "{{ openbao_ssm_tags }}"
+              loop: ["{{ openbao_ssm_root_token }}", "{{ openbao_ssm_recovery_key }}"]
+              delegate_to: localhost
+              become: false
+              vars:
+                ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+            - name: Initialise, with one recovery key
+              ansible.builtin.command:
+                argv: >-
+                  {{ openbao_bao + ['operator', 'init', '-recovery-shares=1',
+                     '-recovery-threshold=1', '-format=json'] }}
+              register: openbao_init
+              changed_when: true
+              no_log: true
+
+            - name: Write the root token to SSM
+              community.aws.ssm_parameter:
+                name: "{{ openbao_ssm_root_token }}"
+                value: "{{ (openbao_init.stdout | from_json).root_token }}"
+                string_type: SecureString
+                region: "{{ core_secrets_region }}"
+                tags: "{{ openbao_ssm_tags }}"
+              delegate_to: localhost
+              become: false
+              vars:
+                ansible_python_interpreter: "{{ ansible_playbook_python }}"
+              when: not ansible_check_mode
+              no_log: true
+
+            - name: Write the recovery key to SSM
+              community.aws.ssm_parameter:
+                name: "{{ openbao_ssm_recovery_key }}"
+                value: "{{ (openbao_init.stdout | from_json).recovery_keys_b64[0] }}"
+                string_type: SecureString
+                region: "{{ core_secrets_region }}"
+                tags: "{{ openbao_ssm_tags }}"
+              delegate_to: localhost
+              become: false
+              vars:
+                ansible_python_interpreter: "{{ ansible_playbook_python }}"
+              when: not ansible_check_mode
+              no_log: true
+
+            - name: Read both back from SSM and compare
+              ansible.builtin.assert:
+                that:
+                  - lookup('amazon.aws.ssm_parameter', openbao_ssm_root_token, region=core_secrets_region)
+                    == (openbao_init.stdout | from_json).root_token
+                  - lookup('amazon.aws.ssm_parameter', openbao_ssm_recovery_key, region=core_secrets_region)
+                    == (openbao_init.stdout | from_json).recovery_keys_b64[0]
+                quiet: true
+              when: not ansible_check_mode
+              no_log: true
+
+          rescue:
+            - name: Stop, saying what state OpenBao is in
+              ansible.builtin.fail:
+                msg: >-
+                  {{ ('OpenBao is initialised, but its root token and recovery key are not both
+                  in SSM (task: ' ~ ansible_failed_task.name ~ '). Reset it: stop openbao-0, drop
+                  the tables of PostgreSQL openbao_' ~ openbao_cluster ~ ', start it, run again.')
+                  if (openbao_init.rc | default(1)) == 0
+                  else ('Stopped before init; OpenBao is unchanged (task: ' ~ ansible_failed_task.name ~ ').') }}
+
+        - name: Wait until OpenBao is unsealed
+          ansible.builtin.command:
+            argv: "{{ openbao_bao + ['status', '-format=json'] }}"
+          register: openbao_unsealed
+          until: openbao_unsealed.rc == 0 and not (openbao_unsealed.stdout | from_json).sealed
+          retries: 24
+          delay: 5
+          changed_when: false
+          failed_when: false
+          when: not ansible_check_mode
+
+        - name: Configure OpenBao
+          # In check mode before init there is no token yet: nothing to compare.
+          when: openbao_status.initialized or not ansible_check_mode
+          block:
+            - name: Fail if OpenBao is still sealed
+              ansible.builtin.assert:
+                that: ansible_check_mode or openbao_unsealed.rc == 0
+                fail_msg: OpenBao is still sealed after 2 minutes; see openbao-0's log.
+                quiet: true
+
+            - name: Read the root token from SSM
+              ansible.builtin.set_fact:
+                openbao_token: "{{ lookup('amazon.aws.ssm_parameter', openbao_ssm_root_token, region=core_secrets_region) }}"
+              no_log: true
+
+            # Mounts and auth methods
+            - name: List the secrets engines and auth methods
+              ansible.builtin.command:
+                argv: "{{ openbao_bao_auth + [item, 'list', '-format=json'] }}"
+                stdin: "{{ openbao_token }}"
+              loop: [secrets, auth]
+              register: openbao_enabled
+              changed_when: false
+              check_mode: false
+              no_log: true
+
+            - name: Enable the missing secrets engines
+              ansible.builtin.command:
+                argv: "{{ openbao_bao_auth + ['secrets', 'enable', '-path=' ~ item.path] + item.options + [item.type] }}"
+                stdin: "{{ openbao_token }}"
+              loop: "{{ openbao_mounts }}"
+              when: (item.path ~ '/') not in (openbao_enabled.results[0].stdout | from_json)
+              changed_when: true
+              no_log: true
+
+            - name: Enable the missing auth methods
+              ansible.builtin.command:
+                argv: "{{ openbao_bao_auth + ['auth', 'enable', '-path=' ~ item.path, item.type] }}"
+                stdin: "{{ openbao_token }}"
+              loop: "{{ openbao_auth_methods }}"
+              when: (item.path ~ '/') not in (openbao_enabled.results[1].stdout | from_json)
+              changed_when: true
+              no_log: true
+
+            # Internal CA: root, then the intermediate it signs
+            - name: List the issuers of pki/ and pki_int/
+              ansible.builtin.command:
+                argv: "{{ openbao_bao_auth + ['list', '-format=json', item ~ '/issuers'] }}"
+                stdin: "{{ openbao_token }}"
+              loop: [pki, pki_int]
+              register: openbao_issuers
+              changed_when: false
+              # 2: no issuer yet. In check mode the mounts may not exist yet.
+              failed_when: openbao_issuers.rc not in [0, 2] and not ansible_check_mode
+              check_mode: false
+              no_log: true
+
+            - name: Generate the root certificate, once
+              ansible.builtin.command:
+                argv: >-
+                  {{ openbao_bao_auth + ['write', '-format=json', 'pki/root/generate/internal',
+                     'common_name=' ~ openbao_pki_root.common_name, 'issuer_name=root',
+                     'key_type=ec', 'key_bits=256', 'ttl=' ~ openbao_pki_root.ttl] }}
+                stdin: "{{ openbao_token }}"
+              when: openbao_issuers.results[0].rc != 0
+              changed_when: true
+              no_log: true
+
+            - name: Intermediate certificate, once
+              when: openbao_issuers.results[1].rc != 0 and not ansible_check_mode
+              block:
+                - name: Generate the intermediate's key and request
+                  ansible.builtin.command:
+                    argv: >-
+                      {{ openbao_bao_auth + ['write', '-format=json', 'pki_int/intermediate/generate/internal',
+                         'common_name=' ~ openbao_pki_int.common_name, 'key_type=ec', 'key_bits=256'] }}
+                    stdin: "{{ openbao_token }}"
+                  register: openbao_int_csr
+                  changed_when: true
+                  no_log: true
+
+                - name: Sign the request with the root
+                  ansible.builtin.command:
+                    argv: >-
+                      {{ openbao_bao_auth + ['write', '-format=json', 'pki/root/sign-intermediate',
+                         'csr=-', 'format=pem_bundle', 'ttl=' ~ openbao_pki_int.ttl] }}
+                    stdin: "{{ openbao_token ~ '\n' ~ (openbao_int_csr.stdout | from_json).data.csr }}"
+                  register: openbao_int_cert
+                  changed_when: true
+                  no_log: true
+
+                - name: Import the signed intermediate
+                  ansible.builtin.command:
+                    argv: "{{ openbao_bao_auth + ['write', 'pki_int/intermediate/set-signed', 'certificate=-'] }}"
+                    stdin: "{{ openbao_token ~ '\n' ~ (openbao_int_cert.stdout | from_json).data.certificate }}"
+                  changed_when: true
+                  no_log: true
+
+            # Desired state: policies, roles, PKI and auth configuration
+            - name: Read each configured path
+              ansible.builtin.command:
+                argv: "{{ openbao_bao_auth + ['read', '-format=json', item.path] }}"
+                stdin: "{{ openbao_token }}"
+              loop: "{{ openbao_config }}"
+              register: openbao_config_now
+              changed_when: false
+              # 2: not written yet. In check mode the mounts may not exist yet.
+              failed_when: openbao_config_now.rc not in [0, 2] and not ansible_check_mode
+              check_mode: false
+              no_log: true
+
+            - name: Write each path whose fields differ
+              ansible.builtin.command:
+                argv: "{{ openbao_bao_auth + ['write', item.item.path, '-'] }}"
+                stdin: "{{ openbao_token ~ '\n' ~ (item.item.data | to_json) }}"
+              loop: "{{ openbao_config_now.results }}"
+              when: >-
+                item.rc != 0
+                or ((item.stdout | from_json).data | dict2items
+                    | selectattr('key', 'in', item.item.data | list) | items2dict) != item.item.data
+              changed_when: true
+              no_log: true
+
+            # Bootstrap secrets
+            - name: Garage keys for Mimir, Loki and Tempo
+              ansible.builtin.include_tasks: tasks/openbao_kv.yml
+              loop: "{{ garage_buckets }}"
+              vars:
+                openbao_kv_path: garage/{{ item }}
+                openbao_garage_key: "{{ core_secrets_prefix }}/garage/{{ item }}-key"
+                openbao_kv_data:
+                  access_key_id: "{{ lookup('amazon.aws.ssm_parameter', openbao_garage_key ~ '-id', region=core_secrets_region) }}"
+                  secret_access_key: "{{ lookup('amazon.aws.ssm_parameter', openbao_garage_key ~ '-secret', region=core_secrets_region) }}"
+
+            - name: ExternalDNS's update key for BIND
+              ansible.builtin.include_tasks: tasks/openbao_kv.yml
+              vars:
+                openbao_kv_path: externaldns/bind
+                openbao_kv_data:
+                  # As role bind names and declares it (update-key.conf.j2).
+                  tsig_keyname: "{{ openbao_cluster }}-update"
+                  tsig_algorithm: hmac-sha256
+                  tsig_secret: "{{ lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/bind/' ~ openbao_cluster, region=core_secrets_region) }}"
+
+            - name: Read Argo CD's initial admin password, while its Secret exists
+              ansible.builtin.command:
+                argv: >-
+                  {{ openbao_kubectl + ['-n', 'argocd', 'get', 'secret', 'argocd-initial-admin-secret',
+                     '--ignore-not-found', '-o', 'jsonpath={.data.password}'] }}
+              register: openbao_argocd_initial
+              changed_when: false
+              check_mode: false
+              no_log: true
+
+            - name: Argo CD's break-glass password, moved to OpenBao
+              when: openbao_argocd_initial.stdout | length > 0
+              block:
+                - name: Argo CD's break-glass password
+                  ansible.builtin.include_tasks: tasks/openbao_kv.yml
+                  vars:
+                    openbao_kv_path: break-glass/argocd
+                    openbao_kv_data:
+                      username: admin
+                      password: "{{ openbao_argocd_initial.stdout | b64decode }}"
+
+                - name: Read it back from OpenBao
+                  ansible.builtin.command:
+                    argv: "{{ openbao_bao_auth + ['kv', 'get', '-mount=secret', '-field=password', 'break-glass/argocd'] }}"
+                    stdin: "{{ openbao_token }}"
+                  register: openbao_argocd_stored
+                  changed_when: false
+                  when: not ansible_check_mode
+                  no_log: true
+
+                - name: Check the copy in OpenBao equals the Secret
+                  ansible.builtin.assert:
+                    that: openbao_argocd_stored.stdout == (openbao_argocd_initial.stdout | b64decode)
+                    fail_msg: The password in OpenBao differs; argocd-initial-admin-secret is kept.
+                    quiet: true
+                  when: not ansible_check_mode
+                  no_log: true
+
+                - name: Delete argocd-initial-admin-secret
+                  ansible.builtin.command:
+                    argv: "{{ openbao_kubectl + ['-n', 'argocd', 'delete', 'secret', 'argocd-initial-admin-secret'] }}"
+                  changed_when: true
+
+      always:
+        - name: Remove the kubeconfig
+          ansible.builtin.file:
+            path: "{{ openbao_kubeconfig }}"
+            state: absent
+          # Also in check mode: the kubeconfig is written in check mode too.
+          check_mode: false

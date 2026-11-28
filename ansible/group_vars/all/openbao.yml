@@ -1,0 +1,105 @@
+# OpenBao's one-time initialisation and configuration in a cluster
+# (playbooks/openbao_init.yml; Platform Design Decisions 18 and 22; TAE-139).
+# No secret here: the values come from SSM at run time.
+#
+# Written by the playbook into SSM, read back from there afterwards:
+#   openbao/root-token-<cluster>     root token from `bao operator init`
+#   openbao/recovery-key-<cluster>   the one recovery key (static seal), base64
+
+# Secrets engines and auth methods, enabled when missing. KV version 2 at
+# secret/ for External Secrets; the internal certificate authority
+# (decision 22): a root in pki/ that signs only the intermediate in pki_int/,
+# through which cert-manager signs.
+openbao_mounts:
+  - {path: secret, type: kv, options: [-version=2]}
+  - {path: pki, type: pki, options: [-max-lease-ttl=87600h]}
+  - {path: pki_int, type: pki, options: [-max-lease-ttl=43800h]}
+openbao_auth_methods:
+  - {path: kubernetes, type: kubernetes}
+
+openbao_pki_root: {common_name: Taelron Platform Root CA, ttl: 87600h}
+openbao_pki_int: {common_name: Taelron Platform Intermediate CA, ttl: 43800h}
+openbao_pki_url: http://openbao.openbao.svc.cluster.local:8200
+
+# Desired state, in order: each path is read, and written with this data
+# when a field differs. Fields as OpenBao returns them (durations in seconds).
+openbao_config:
+  # OpenBao checks service account tokens with its own token and CA
+  # (the chart binds system:auth-delegator).
+  - path: auth/kubernetes/config
+    data:
+      kubernetes_host: https://kubernetes.default.svc
+
+  - path: pki/config/urls
+    data:
+      issuing_certificates: ["{{ openbao_pki_url }}/v1/pki/ca"]
+      crl_distribution_points: ["{{ openbao_pki_url }}/v1/pki/crl"]
+  - path: pki_int/config/urls
+    data:
+      issuing_certificates: ["{{ openbao_pki_url }}/v1/pki_int/ca"]
+      crl_distribution_points: ["{{ openbao_pki_url }}/v1/pki_int/crl"]
+
+  # One PKI role per cluster: each cluster's cert-manager signs only its own
+  # names, so a test certificate can never pass for a shared service. No
+  # svc.cluster.local: through the ClusterIssuer any namespace could then
+  # get a certificate for another's Service (OpenBao's, say); Istio's mTLS
+  # covers traffic inside the cluster. ttl 30 days, max_ttl 90 days.
+  - path: pki_int/roles/shared
+    data:
+      allowed_domains: [shared.int.taelron.com]
+      allow_subdomains: true
+      allow_bare_domains: false
+      allow_localhost: false
+      allow_ip_sans: false
+      key_type: ec
+      key_bits: 256
+      ttl: 2592000
+      max_ttl: 7776000
+
+  # Everything in secret/ except the break-glass passwords, which only a
+  # person reads.
+  - path: sys/policies/acl/external-secrets
+    data:
+      policy: |
+        path "secret/data/*" {
+          capabilities = ["read"]
+        }
+        path "secret/metadata/*" {
+          capabilities = ["read", "list"]
+        }
+        path "secret/data/break-glass/*" {
+          capabilities = ["deny"]
+        }
+        path "secret/metadata/break-glass/*" {
+          capabilities = ["deny"]
+        }
+  - path: sys/policies/acl/cert-manager-shared
+    data:
+      policy: |
+        path "pki_int/sign/shared" {
+          capabilities = ["create", "update"]
+        }
+        path "pki_int/issue/shared" {
+          capabilities = ["create", "update"]
+        }
+
+  # Each service account and audience is what its consumer in
+  # platform-gitops uses:
+  #   ClusterSecretStore `openbao`: serviceAccountRef
+  #     external-secrets/external-secrets, audiences [openbao];
+  #   ClusterIssuer `openbao`: serviceAccountRef cert-manager/openbao-issuer;
+  #     cert-manager asks for the audience vault://<issuer name>.
+  - path: auth/kubernetes/role/external-secrets
+    data:
+      bound_service_account_names: [external-secrets]
+      bound_service_account_namespaces: [external-secrets]
+      audience: openbao
+      token_policies: [external-secrets]
+      token_ttl: 3600
+  - path: auth/kubernetes/role/cert-manager
+    data:
+      bound_service_account_names: [openbao-issuer]
+      bound_service_account_namespaces: [cert-manager]
+      audience: vault://openbao
+      token_policies: [cert-manager-shared]
+      token_ttl: 3600

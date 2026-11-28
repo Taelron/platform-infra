@@ -1,0 +1,24 @@
+---
+# One KV version 2 secret at secret/<openbao_kv_path>, written only when its
+# data differs (playbooks/openbao_init.yml). The root token and the data
+# reach bao on stdin.
+- name: Read secret/{{ openbao_kv_path }}
+  ansible.builtin.command:
+    argv: "{{ openbao_bao_auth + ['kv', 'get', '-format=json', '-mount=secret', openbao_kv_path] }}"
+    stdin: "{{ openbao_token }}"
+  register: openbao_kv_now
+  changed_when: false
+  # 2: not written yet. In check mode the mount may not exist yet.
+  failed_when: openbao_kv_now.rc not in [0, 2] and not ansible_check_mode
+  check_mode: false
+  no_log: true
+
+- name: Write secret/{{ openbao_kv_path }}
+  ansible.builtin.command:
+    argv: "{{ openbao_bao_auth + ['kv', 'put', '-mount=secret', openbao_kv_path, '-'] }}"
+    stdin: "{{ openbao_token ~ '\n' ~ (openbao_kv_data | to_json) }}"
+  changed_when: true
+  when: >-
+    openbao_kv_now.rc != 0
+    or (openbao_kv_now.stdout | from_json).data.data != openbao_kv_data
+  no_log: true
