@@ -58,7 +58,7 @@
     - Reload systemd
     - Restart k3s
 
-# k3s applies every file in this folder: Traefik's settings, cert-manager and
+# k3s applies every file in this folder: Traefik's settings, cert-manager,
 # Rancher, as Helm charts.
 - name: Write the cluster's charts
   ansible.builtin.template:
@@ -71,6 +71,7 @@
     - traefik-config.yaml
     - cert-manager.yaml
     - rancher.yaml
+    - coredns-custom.yaml
   no_log: true
 
 - name: Flush handlers so k3s starts with its configuration
