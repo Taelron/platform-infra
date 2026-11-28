@@ -51,8 +51,12 @@ openbao_config:
       allow_bare_domains: false
       allow_localhost: false
       allow_ip_sans: false
-      key_type: ec
-      key_bits: 256
+      # cert-manager sends DNS names only, and RSA keys unless a Certificate
+      # asks for ECDSA: any key type at OpenBao's minimum size (RSA 2048,
+      # EC P-256), no common name required (measured on shared, 28 November).
+      require_cn: false
+      key_type: any
+      key_bits: 0
       ttl: 2592000
       max_ttl: 7776000
 
