@@ -54,9 +54,16 @@
   changed_when: false
   check_mode: false
 
+- name: Read caplv's user ID (nft may list the rule by number)
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ kvm_caplv_user }}"
+
 - name: Refuse to open sshd for caplv before the firewall holds it
   ansible.builtin.assert:
-    that: kvm_nft_output.stdout is search('skuid "?' ~ kvm_caplv_user ~ '"? ct state new drop')
+    that: >-
+      kvm_nft_output.stdout is search('skuid ("?' ~ kvm_caplv_user ~ '"?|'
+      ~ ansible_facts.getent_passwd[kvm_caplv_user][1] ~ ') ct state new drop')
     fail_msg: The nftables rule for {{ kvm_caplv_user }} is not loaded; run role network first.
     quiet: true
 
