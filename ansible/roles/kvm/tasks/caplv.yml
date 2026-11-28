@@ -39,17 +39,6 @@
   check_mode: false
   failed_when: false
 
-# Not "restrict": it would also forbid the Unix socket forwarding CAPLV uses.
-# sshd's block below allows that forwarding only.
-- name: Let CAPLV sign in with its key, from the mgmt pods only
-  ansible.posix.authorized_key:
-    user: "{{ kvm_caplv_user }}"
-    key: "{{ kvm_caplv_pub.content | b64decode }}"
-    key_options: from="{{ k3s_pod_cidr }}",no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc
-    exclusive: true
-    state: present
-  when: kvm_caplv_pub.content is defined
-
 # At the end of sshd_config: a Match block ends only at the next Match or at
 # the end of the file, so it cannot sit in a drop-in read first.
 - name: Let CAPLV forward local Unix sockets only, and nothing else
@@ -69,3 +58,19 @@
           ForceCommand /sbin/nologin
     validate: /usr/sbin/sshd -t -f %s
   notify: Reload sshd
+
+# sshd holds the block above before the key exists: never a moment with the
+# key and without the limits.
+- name: Reload sshd before installing the key
+  ansible.builtin.meta: flush_handlers
+
+# Not "restrict": it would also forbid the Unix socket forwarding CAPLV uses.
+# sshd's block below allows that forwarding only.
+- name: Let CAPLV sign in with its key, from the mgmt pods only
+  ansible.posix.authorized_key:
+    user: "{{ kvm_caplv_user }}"
+    key: "{{ kvm_caplv_pub.content | b64decode }}"
+    key_options: from="{{ k3s_pod_cidr }}",no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc
+    exclusive: true
+    state: present
+  when: kvm_caplv_pub.content is defined
