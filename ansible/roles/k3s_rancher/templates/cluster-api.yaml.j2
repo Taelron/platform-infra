@@ -1,0 +1,103 @@
+# {{ ansible_managed }}
+# Cluster API providers for Rancher Turtles (Platform Design Decisions 6).
+# Secrets are applied apart (tasks/cluster_api.yml).
+{% for ns in ['rke2-bootstrap-system', 'rke2-control-plane-system', 'caplv-system'] %}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ ns }}
+{% endfor %}
+{% for c in cluster_api_clusters %}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ c }}
+  labels:
+    cluster-api.cattle.io/rancher-auto-import: "true"
+{% endfor %}
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: rke2-bootstrap
+  namespace: rke2-bootstrap-system
+spec:
+  name: rke2
+  type: bootstrap
+  version: {{ caprke2_version }}
+  enableAutomaticUpdate: false
+  fetchConfig:
+    url: https://github.com/rancher/cluster-api-provider-rke2/releases/download/{{ caprke2_version }}/bootstrap-components.yaml
+  deployment:
+    containers:
+      - name: manager
+        imageUrl: {{ caprke2_bootstrap_image }}
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: rke2-control-plane
+  namespace: rke2-control-plane-system
+spec:
+  name: rke2
+  type: controlPlane
+  version: {{ caprke2_version }}
+  enableAutomaticUpdate: false
+  fetchConfig:
+    url: https://github.com/rancher/cluster-api-provider-rke2/releases/download/{{ caprke2_version }}/control-plane-components.yaml
+  deployment:
+    containers:
+      - name: manager
+        imageUrl: {{ caprke2_controlplane_image }}
+---
+# The provider's variables: LIBVIRT_URI holds no secret (the key is in
+# Secret caplv-ssh).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: caplv-variables
+  namespace: caplv-system
+type: Opaque
+stringData:
+  LIBVIRT_URI: "{{ caplv_libvirt_uri }}"
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: libvirt
+  namespace: caplv-system
+spec:
+  name: libvirt
+  type: infrastructure
+  version: {{ caplv_version }}
+  enableAutomaticUpdate: false
+  configSecret:
+    name: caplv-variables
+  fetchConfig:
+    url: {{ caplv_components_url }}
+  manifestPatches:
+    # The SSH key and known_hosts, readable by the non-root manager.
+    - |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: caplv-controller-manager
+        namespace: caplv-system
+      spec:
+        template:
+          spec:
+            securityContext:
+              fsGroup: 65532
+            containers:
+              - name: manager
+                volumeMounts:
+                  - name: caplv-ssh
+                    mountPath: /caplv-ssh
+                    readOnly: true
+            volumes:
+              - name: caplv-ssh
+                secret:
+                  secretName: caplv-ssh
+                  defaultMode: 0440

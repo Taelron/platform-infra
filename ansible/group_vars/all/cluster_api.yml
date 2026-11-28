@@ -1,0 +1,24 @@
+# Cluster API in the mgmt cluster (Platform Design Decisions 6, TAE-139).
+# Rancher 2.15.3 ships Rancher Turtles (0.27.4) with the Cluster API core
+# provider (v1.13.3); role k3s_rancher adds the providers below as Turtles
+# CAPIProvider objects.
+
+# CAPRKE2: the 0.25 line is built on Cluster API 1.13, the core Rancher ships
+# (0.27 targets 1.14). Images pinned by digest over the release's tags.
+caprke2_version: v0.25.3
+caprke2_bootstrap_image: ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha256:d5dd9b5fec2752b053876361082d182837c49a6bbd33cd557de3234d23309b85
+caprke2_controlplane_image: ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:a251f9499bda47f9fe23ac5f9423092c2ef5f0149ff368a5528ffbad74a95fd6
+
+# CAPLV: Taelron's fork; its release manifest already names the image by
+# digest (ghcr.io/taelron/cluster-api-provider-libvirt@sha256:36123d2b…).
+caplv_version: v0.2.1-taelron.1
+caplv_components_url: https://github.com/Taelron/cluster-api-provider-libvirt/releases/download/v0.2.1-taelron.1/infrastructure-components.yaml
+# libvirt on the host over SSH (role kvm): user caplv, the libvirt socket only.
+caplv_libvirt_uri: >-
+  qemu+libssh://{{ kvm_caplv_user }}@{{ host_vpc_address }}/system?keyfile=/caplv-ssh/id&known_hosts=/caplv-ssh/known_hosts&sshauth=privkey
+
+# The clusters Cluster API builds, one namespace each on mgmt: Rancher imports
+# a cluster from a namespace with the auto-import label. Each namespace holds
+# the Secret <cluster>-datastore that CAPRKE2's externalDatastoreSecret names,
+# built from SSM postgresql/rke2_<cluster>.
+cluster_api_clusters: [shared, test, demo]

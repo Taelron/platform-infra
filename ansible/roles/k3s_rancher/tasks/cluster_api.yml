@@ -1,0 +1,79 @@
+---
+# Cluster API in mgmt (Platform Design Decisions 6): the CAPRKE2 and CAPLV
+# providers on Rancher's own Turtles, CAPLV's SSH key, and each cluster's
+# datastore Secret. Applied with kubectl: k3s's manifests folder would keep
+# the Secrets on disk.
+- name: Wait for Rancher's Turtles to serve CAPIProvider
+  ansible.builtin.command: /usr/local/bin/k3s kubectl get crd capiproviders.turtles-capi.cattle.io
+  register: k3s_rancher_capi_crd
+  until: k3s_rancher_capi_crd.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+  check_mode: false
+
+- name: Apply the namespaces and the providers
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s kubectl apply -f -
+    stdin: "{{ lookup('ansible.builtin.template', 'cluster-api.yaml.j2') }}"
+  register: k3s_rancher_capi_apply
+  changed_when: k3s_rancher_capi_apply.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+  when: not ansible_check_mode
+
+- name: Read CAPLV's key and the host's SSH host key
+  ansible.builtin.slurp:
+    src: "{{ item }}"
+  loop:
+    - "{{ kvm_caplv_key }}"
+    - /etc/ssh/ssh_host_ed25519_key.pub
+  register: k3s_rancher_caplv_files
+  no_log: true
+
+- name: Give CAPLV its SSH key and the host's key as Secret caplv-ssh
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s kubectl apply -f -
+    stdin: "{{ secret | to_json }}"
+  vars:
+    host_key: "{{ (k3s_rancher_caplv_files.results[1].content | b64decode).split()[:2] | join(' ') }}"
+    secret:
+      apiVersion: v1
+      kind: Secret
+      metadata: {name: caplv-ssh, namespace: caplv-system}
+      type: Opaque
+      data:
+        id: "{{ k3s_rancher_caplv_files.results[0].content }}"
+        known_hosts: "{{ (host_vpc_address ~ ' ' ~ host_key ~ '\n') | b64encode }}"
+  register: k3s_rancher_caplv_secret
+  changed_when: k3s_rancher_caplv_secret.stdout is not search(' unchanged$')
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Give each cluster its datastore Secret, from SSM
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s kubectl apply -f -
+    stdin: "{{ secret | to_json }}"
+  vars:
+    password: "{{ lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/postgresql/rke2_' ~ item, region=core_secrets_region) }}"
+    secret:
+      apiVersion: v1
+      kind: Secret
+      metadata: {name: "{{ item }}-datastore", namespace: "{{ item }}"}
+      type: Opaque
+      stringData:
+        endpoint: "postgres://rke2_{{ item }}:{{ password | urlencode }}@{{ postgresql_address }}:5432/rke2_{{ item }}?sslmode=require"
+  loop: "{{ cluster_api_clusters }}"
+  register: k3s_rancher_datastore_secrets
+  changed_when: k3s_rancher_datastore_secrets.stdout is not search(' unchanged$')
+  when: not ansible_check_mode
+  no_log: true
+
+- name: Wait for every Cluster API provider to be ready
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl get capiproviders -A
+    -o jsonpath='{range .items[*]}{.metadata.name}={.status.phase}{"\n"}{end}'
+  register: k3s_rancher_capi_phases
+  until: k3s_rancher_capi_phases.stdout_lines | reject('search', '=Ready$') | list | length == 0
+  retries: 30
+  delay: 10
+  changed_when: false
+  when: not ansible_check_mode
