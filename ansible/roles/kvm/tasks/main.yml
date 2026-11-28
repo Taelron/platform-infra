@@ -24,6 +24,24 @@
   loop: "{{ kvm_libvirt_sockets }}"
   ignore_errors: "{{ ansible_check_mode }}"
 
+# A host stop shuts each VM down cleanly first. Without libvirt-guests,
+# stopping virtqemud killed the VM outright, and a file written a minute
+# before the stop was found empty on the node (TAE-139, 28 November 2026).
+- name: Configure libvirt-guests
+  ansible.builtin.template:
+    src: libvirt-guests.j2
+    dest: /etc/sysconfig/libvirt-guests
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Run libvirt-guests, so it acts at every host stop
+  ansible.builtin.systemd_service:
+    name: libvirt-guests
+    state: started
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
 # The VMs use the four bridges only; libvirt's own NAT network would add a
 # fifth zone, outside the design.
 - name: Look for libvirt's default network
