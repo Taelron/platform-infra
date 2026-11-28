@@ -1,0 +1,46 @@
+---
+# CAPLV (in the mgmt cluster) creates and deletes the cluster VMs through
+# libvirt over SSH, as this user. Group libvirt gives it libvirt's system
+# instance (polkit) and nothing else on the host.
+- name: Create the CAPLV user
+  ansible.builtin.user:
+    name: "{{ kvm_caplv_user }}"
+    comment: Cluster API libvirt provider
+    groups: [libvirt]
+    append: true
+    shell: /bin/bash
+    create_home: true
+    password: "!"
+
+- name: Create the folder of CAPLV's key
+  ansible.builtin.file:
+    path: "{{ kvm_caplv_key | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+# Made once on the host, never in Git or SSM: the private key goes only to
+# the mgmt cluster, as the Secret CAPLV mounts (role k3s_rancher).
+- name: Create CAPLV's SSH key pair
+  ansible.builtin.command: >-
+    ssh-keygen -q -t ed25519 -N '' -C caplv@{{ inventory_hostname }} -f {{ kvm_caplv_key }}
+  args:
+    creates: "{{ kvm_caplv_key }}"
+
+- name: Read CAPLV's public key
+  ansible.builtin.slurp:
+    src: "{{ kvm_caplv_key }}.pub"
+  register: kvm_caplv_pub
+  check_mode: false
+  failed_when: false
+
+# restrict: no forwarding of any kind, no pty; from: the mgmt pods only.
+- name: Let CAPLV sign in with its key, from the mgmt pods only
+  ansible.posix.authorized_key:
+    user: "{{ kvm_caplv_user }}"
+    key: "{{ kvm_caplv_pub.content | b64decode }}"
+    key_options: restrict,from="{{ k3s_pod_cidr }}"
+    exclusive: true
+    state: present
+  when: kvm_caplv_pub.content is defined

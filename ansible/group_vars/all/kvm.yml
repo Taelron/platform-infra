@@ -1,0 +1,25 @@
+# libvirt for the cluster VMs that CAPLV creates (Platform Design Decisions 6
+# and 31, TAE-139).
+
+# The node OS: openSUSE Leap Micro 6.2, the "Default qcow" image, pinned by
+# build and checksum. A newer build is a pull request changing both.
+kvm_node_image_url: https://download.opensuse.org/distribution/leap-micro/6.2/appliances/openSUSE-Leap-Micro.x86_64-6.2-Default-qcow-Build12.9.qcow2
+kvm_node_image_sha256: 7e8d63179afbc4e6c6573e572ffb00ad1d1da4a3ba021bbc8d4ef1cb686d019f
+# Where every node's disk takes its backing file from (LibvirtMachineTemplate
+# backingImagePath). On the OS volume: 1.6 GB, read only by the VMs.
+kvm_node_image_path: /var/lib/libvirt/images/base/leap-micro-6.2.qcow2
+
+# libvirt storage pools: the base image, and one per cluster on its EBS volume
+# (group_vars disks.yml mounts it). Under /var/lib/libvirt/images, which the
+# SELinux policy labels for VM disks.
+kvm_pools:
+  - name: base
+    path: /var/lib/libvirt/images/base
+  - name: shared
+    path: /var/lib/libvirt/images/shared
+
+# CAPLV signs in to libvirt over SSH (qemu+libssh) as this user, from the mgmt
+# cluster's pods only (flow 22, sshd AllowUsers). Its key pair is made on the
+# host; role k3s_rancher gives the private key to CAPLV as a Secret.
+kvm_caplv_user: caplv
+kvm_caplv_key: /etc/caplv/id

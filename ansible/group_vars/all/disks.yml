@@ -1,8 +1,9 @@
 # The data volumes on platform-aws-01 (Platform Design Decisions, Disks), each
 # found by its EBS volume ID: the NVMe device number can change between boots.
 # k3s, PostgreSQL and Garage were recreated smaller at the start of M5
-# (TAE-139); the M3 volumes stay detached until the restore is proven. The
-# cluster volumes (shared, test, demo) go to KVM as raw disks, not here.
+# (TAE-139); the M3 volumes stay detached until the restore is proven. Each
+# cluster volume (shared, then test and demo) is mounted as its cluster's
+# libvirt storage pool.
 data_volumes:
   - name: k3s
     volume_id: vol-0637551bba3230f03
@@ -16,3 +17,8 @@ data_volumes:
   - name: garage
     volume_id: vol-09a5e13b5747776a4
     mount: /var/lib/garage
+  # The shared cluster's libvirt storage pool (role kvm): CAPLV creates its
+  # VMs' disks there.
+  - name: shared
+    volume_id: vol-0f364e7c251f1c5ab
+    mount: /var/lib/libvirt/images/shared

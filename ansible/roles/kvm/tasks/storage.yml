@@ -1,0 +1,64 @@
+---
+- name: Create the folder of each storage pool
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0711"
+  loop: "{{ kvm_pools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Download the node OS image, checked against its pinned checksum
+  ansible.builtin.get_url:
+    url: "{{ kvm_node_image_url }}"
+    dest: "{{ kvm_node_image_path }}"
+    checksum: sha256:{{ kvm_node_image_sha256 }}
+    owner: root
+    group: root
+    mode: "0644"
+  # In check mode the pool folder above does not exist yet.
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Read the storage pools libvirt knows
+  ansible.builtin.command: virsh -c qemu:///system pool-list --all --name
+  register: kvm_pool_list
+  changed_when: false
+  check_mode: false
+
+- name: Define each storage pool
+  ansible.builtin.command: >-
+    virsh -c qemu:///system pool-define-as {{ item.name }} dir --target {{ item.path }}
+  loop: "{{ kvm_pools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in kvm_pool_list.stdout_lines
+  changed_when: true
+
+- name: Read the state of each storage pool
+  ansible.builtin.command: virsh -c qemu:///system pool-info {{ item.name }}
+  loop: "{{ kvm_pools }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: kvm_pool_info
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Start each storage pool and start it at boot
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    virsh -c qemu:///system pool-info {{ item.item.name }} | grep -q '^State: *running'
+    || virsh -c qemu:///system pool-start {{ item.item.name }};
+    virsh -c qemu:///system pool-autostart {{ item.item.name }}
+  args:
+    executable: /bin/bash
+  loop: "{{ kvm_pool_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: >-
+    not ansible_check_mode and (item.rc != 0
+    or not (item.stdout is search('State:\s+running'))
+    or not (item.stdout is search('Autostart:\s+yes')))
+  changed_when: true

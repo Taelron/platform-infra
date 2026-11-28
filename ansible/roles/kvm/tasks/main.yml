@@ -45,3 +45,9 @@
 
 - name: Create the cluster networks
   ansible.builtin.import_tasks: networks.yml
+
+- name: Create the storage pools and the node OS image
+  ansible.builtin.import_tasks: storage.yml
+
+- name: Give CAPLV its user on the host
+  ansible.builtin.import_tasks: caplv.yml
