@@ -10,9 +10,9 @@ caprke2_bootstrap_image: ghcr.io/rancher/cluster-api-provider-rke2-bootstrap@sha
 caprke2_controlplane_image: ghcr.io/rancher/cluster-api-provider-rke2-controlplane@sha256:a251f9499bda47f9fe23ac5f9423092c2ef5f0149ff368a5528ffbad74a95fd6
 
 # CAPLV: Taelron's fork; its release manifest already names the image by
-# digest (ghcr.io/taelron/cluster-api-provider-libvirt@sha256:36123d2b…).
-caplv_version: v0.2.1-taelron.1
-caplv_components_url: https://github.com/Taelron/cluster-api-provider-libvirt/releases/download/v0.2.1-taelron.1/infrastructure-components.yaml
+# digest, as name:tag@digest (Turtles refuses an image without a tag).
+caplv_version: v0.2.1-taelron.2
+caplv_components_url: https://github.com/Taelron/cluster-api-provider-libvirt/releases/download/v0.2.1-taelron.2/infrastructure-components.yaml
 # libvirt on the host over SSH (role kvm): user caplv, the libvirt socket only.
 caplv_libvirt_uri: >-
   qemu+libssh://{{ kvm_caplv_user }}@{{ host_vpc_address }}/system?keyfile=/caplv-ssh/id&known_hosts=/caplv-ssh/known_hosts&sshauth=privkey
