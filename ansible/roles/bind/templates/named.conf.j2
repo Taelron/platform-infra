@@ -60,6 +60,13 @@ zone "{{ dns_internal_zone }}" IN {
     grant {{ c }}-update subdomain {{ c }}.{{ dns_internal_zone }}. ANY;
 {% endfor %}
   };
+  // ExternalDNS (RFC 2136) reads the zone by AXFR, signed with its update
+  // key, to find the records it owns; it still writes only its own subdomain.
+  allow-transfer {
+{% for c in dns_update_clusters %}
+    key {{ c }}-update;
+{% endfor %}
+  };
 };
 
 {% for o in dns_local_overrides %}
