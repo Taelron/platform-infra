@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.1.0](https://github.com/Taelron/platform-infra/compare/core-v1.0.0...core-v1.1.0) (2026-11-28)
+
+
+### Features
+
+* **core:** Alloy on the host sends to Mimir and Loki in shared (Part of TAE-139) ([#103](https://github.com/Taelron/platform-infra/issues/103)) ([9a2b2dc](https://github.com/Taelron/platform-infra/commit/9a2b2dcb0fda6e36ef12e284558f110a7a4b7380))
+* **core:** apply a cluster definition from platform-gitops to mgmt (Part of TAE-139) ([#86](https://github.com/Taelron/platform-infra/issues/86)) ([83a0643](https://github.com/Taelron/platform-infra/commit/83a0643f02ef34f931d4da4f30a825150a6dbc3a))
+* **core:** apply shared with kube-proxy replacement and no Traefik (Part of TAE-139) ([#96](https://github.com/Taelron/platform-infra/issues/96)) ([7247515](https://github.com/Taelron/platform-infra/commit/7247515b1d89a14bfd4c78bf4217eaacf02927b1))
+* **core:** apply shared's node replacement, VM with ACPI (Part of TAE-139) ([#101](https://github.com/Taelron/platform-infra/issues/101)) ([daf0974](https://github.com/Taelron/platform-infra/commit/daf09745fc6c4fc4471eb69957169edb77c0543f))
+* **core:** Argo CD in shared, installed once, then managing itself (Part of TAE-139) ([#93](https://github.com/Taelron/platform-infra/issues/93)) ([0ee4de9](https://github.com/Taelron/platform-infra/commit/0ee4de9e91b1606fab2c29065427b7ccf3edf25f))
+* **core:** BIND lets each update key transfer the internal zone (Part of TAE-139) ([#99](https://github.com/Taelron/platform-infra/issues/99)) ([54c7b95](https://github.com/Taelron/platform-infra/commit/54c7b9501985db82fd979506b781a41bffed5455))
+* **core:** CAPLV user, storage pools and the Leap Micro image; narrower cluster access (Part of TAE-139) ([#80](https://github.com/Taelron/platform-infra/issues/80)) ([abf8f04](https://github.com/Taelron/platform-infra/commit/abf8f04ff50c7919e0377f744676a3a6706a254c))
+* **core:** CAPLV v0.2.1-taelron.3, cluster VMs autostart (Part of TAE-139) ([#95](https://github.com/Taelron/platform-infra/issues/95)) ([cdf694c](https://github.com/Taelron/platform-infra/commit/cdf694c6ed0da5f404f86bab19ad04510d16a153))
+* **core:** Cluster API providers CAPRKE2 and CAPLV in mgmt (Part of TAE-139) ([#83](https://github.com/Taelron/platform-infra/issues/83)) ([69a2604](https://github.com/Taelron/platform-infra/commit/69a26043582062ec52e844004600e5bd513a7071))
+* **core:** cluster bridges as libvirt networks with DHCP, NAT and their flows (Part of TAE-139) ([#79](https://github.com/Taelron/platform-infra/issues/79)) ([8df4d8a](https://github.com/Taelron/platform-infra/commit/8df4d8aaa5ae7a605af1f63d79c31a9d080ea79a))
+* **core:** flow 23, mgmt pods to the clusters' API addresses (Part of TAE-139) ([#90](https://github.com/Taelron/platform-infra/issues/90)) ([f67417b](https://github.com/Taelron/platform-infra/commit/f67417bedce47b9ff56780f269b14921595d7d9b))
+* **core:** Grafana's database password and admin in OpenBao (Part of TAE-139) ([#102](https://github.com/Taelron/platform-infra/issues/102)) ([fb0038a](https://github.com/Taelron/platform-infra/commit/fb0038a1da1c01c9cd3b5281db83a07eea03d713))
+* **core:** libvirt-guests shuts the cluster VMs down cleanly at every host stop (Part of TAE-139) ([#100](https://github.com/Taelron/platform-infra/issues/100)) ([f4aefdd](https://github.com/Taelron/platform-infra/commit/f4aefddbd7698f92f3833c6240f5730942513644))
+* **core:** OpenBao database and bootstrap Secrets for shared (Part of TAE-139) ([#94](https://github.com/Taelron/platform-infra/issues/94)) ([3732c5c](https://github.com/Taelron/platform-infra/commit/3732c5c311a957ab41762ab484cd18bbbea972f0))
+* **core:** OpenBao initialisation and bootstrap secrets in shared (Part of TAE-139) ([#97](https://github.com/Taelron/platform-infra/issues/97)) ([f80e8ef](https://github.com/Taelron/platform-infra/commit/f80e8ef2200ea4d86eb0dd3af163262b3f18862b))
+
+
+### Bug Fixes
+
+* **core:** CAPLV forwards the libvirt socket only (Part of TAE-139) ([#81](https://github.com/Taelron/platform-infra/issues/81)) ([2fc8c26](https://github.com/Taelron/platform-infra/commit/2fc8c264419aa12a70dffc9e5776e30758b9b595))
+* **core:** CAPLV known_hosts lines built by a plain loop (Part of TAE-139) ([#88](https://github.com/Taelron/platform-infra/issues/88)) ([753e21f](https://github.com/Taelron/platform-infra/commit/753e21f0b87f6611649f7f6934916910a94e1c38))
+* **core:** CAPLV may forward the libvirt socket; caplv opens no IP connection (Part of TAE-139) ([#89](https://github.com/Taelron/platform-infra/issues/89)) ([9357950](https://github.com/Taelron/platform-infra/commit/9357950a1df6c9d2a4e025fde2a0ff3ff68fa3db))
+* **core:** CAPLV patch as an RFC 6902 JSON patch (Part of TAE-139) ([#85](https://github.com/Taelron/platform-infra/issues/85)) ([9c1c91a](https://github.com/Taelron/platform-infra/commit/9c1c91a1f063d70ae37a5b3710ba566a5052d3e5))
+* **core:** CAPLV v0.2.1-taelron.2, image with tag and digest (Part of TAE-139) ([#84](https://github.com/Taelron/platform-infra/issues/84)) ([fa02627](https://github.com/Taelron/platform-infra/commit/fa02627d9fb1bc731e6d4ef3ab0c61e7a50ea216))
+* **core:** every host key in CAPLV known_hosts (Part of TAE-139) ([#87](https://github.com/Taelron/platform-infra/issues/87)) ([d5e0993](https://github.com/Taelron/platform-infra/commit/d5e09935abf6e08a0fa603327c101a89d1e0f082))
+* **core:** k3s_rancher Secrets as data, so a run changes nothing (Part of TAE-139) ([#92](https://github.com/Taelron/platform-infra/issues/92)) ([780c93e](https://github.com/Taelron/platform-infra/commit/780c93ed976a797bdfc2664bab5b70b0c4cfb511))
+* **core:** M5 volumes, Garage at 45 GB, pgBackRest restore playbook (Part of TAE-139) ([#73](https://github.com/Taelron/platform-infra/issues/73)) ([b2d6b15](https://github.com/Taelron/platform-infra/commit/b2d6b15c28965d7641182959eb63cfb070fa8d42))
+* **core:** PKI role shared accepts cert-manager's requests (Part of TAE-139) ([#98](https://github.com/Taelron/platform-infra/issues/98)) ([87a7056](https://github.com/Taelron/platform-infra/commit/87a70569a0ccba07ddcf504bc73d1ca021bf20be))
+* **core:** Rancher's name resolves to its Service inside mgmt (Part of TAE-139) ([#91](https://github.com/Taelron/platform-infra/issues/91)) ([0709297](https://github.com/Taelron/platform-infra/commit/0709297d0f115d9e94e1d0453373f4e381fca3ec))
+
 ## 1.0.0 (2026-11-17)
 
 
