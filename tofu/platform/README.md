@@ -21,3 +21,8 @@ The SSH source address is personal data and not in Git. GitHub Actions reads it
 from the secret `ADMIN_SSH_CIDR`. On the RHEL box, export the same `/32` at run
 time in `TF_VAR_admin_ssh_cidr` (the box's outbound address, which is fixed),
 then plan with `tofu plan -lock=false`.
+
+When the box's outbound address changes, SSH to the host times out. Update the
+secret, then open a pull request under `tofu/` so the pipeline plans and
+applies the new rule; until then, SSH goes through Session Manager
+(`ProxyCommand` with the document `AWS-StartSSHSession`).
