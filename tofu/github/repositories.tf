@@ -49,7 +49,13 @@ resource "github_repository" "platform" {
 # 28 November 2026): Rancher's Cluster API creates the cluster VMs on the
 # host's KVM through it. The fork carries Taelron's patch (the VM CPU in
 # host-passthrough mode, which openSUSE Leap Micro 6 needs) and builds the
-# image the platform deploys by digest. Public, like the upstream.
+# image the platform deploys by digest. Public, like the upstream. Forked by
+# hand (the app cannot create repositories) and imported.
+import {
+  to = github_repository.caplv
+  id = "cluster-api-provider-libvirt"
+}
+
 resource "github_repository" "caplv" {
   name         = "cluster-api-provider-libvirt"
   description  = "Cluster API provider for libvirt, Taelron fork"
