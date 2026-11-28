@@ -22,3 +22,10 @@ caplv_libvirt_uri: >-
 # the Secret <cluster>-datastore that CAPRKE2's externalDatastoreSecret names,
 # built from SSM postgresql/rke2_<cluster>.
 cluster_api_clusters: [shared, test, demo]
+
+# The cluster definitions in platform-gitops that playbooks/cluster_apply.yml
+# applies to mgmt, each at a pinned commit (shared once, before Argo CD runs:
+# Platform Design Decisions 6). A new commit is a pull request changing it.
+cluster_apply_repository: https://raw.githubusercontent.com/Taelron/platform-gitops
+cluster_apply_definitions:
+  shared: e7894038125c1f7a8d7c7201b0efb552928c3f58
