@@ -15,20 +15,20 @@ postgresql_max_connections: 1024
 postgresql_host_sources: ["{{ bridges[0].prefix }}.0/24"]
 postgresql_databases:
   - { name: k3s, from: "{{ postgresql_host_sources }}" }
-  - { name: rke2_shared, from: ["{{ clusters.shared.vm }}/32"] }
-  - { name: rke2_test, from: ["{{ clusters.test.vm }}/32"] }
-  - { name: rke2_demo, from: ["{{ clusters.demo.vm }}/32"] }
+  - { name: rke2_shared, from: ["{{ clusters.shared.cidr }}"] }
+  - { name: rke2_test, from: ["{{ clusters.test.cidr }}"] }
+  - { name: rke2_demo, from: ["{{ clusters.demo.cidr }}"] }
   - { name: aap_gateway, from: "{{ postgresql_host_sources }}" }
   - { name: aap_controller, from: "{{ postgresql_host_sources }}" }
   - { name: aap_hub, from: "{{ postgresql_host_sources }}", extensions: [hstore] }
   - { name: aap_eda, from: "{{ postgresql_host_sources }}" }
   - { name: aap_metrics, from: "{{ postgresql_host_sources }}" }
-  - { name: keycloak_platform, from: ["{{ clusters.shared.vm }}/32"] }
-  - { name: keycloak_test, from: ["{{ clusters.test.vm }}/32"] }
-  - { name: keycloak_demo, from: ["{{ clusters.demo.vm }}/32"] }
-  - { name: grafana, from: ["{{ clusters.shared.vm }}/32"] }
-  - { name: fleetdesk_test, from: ["{{ clusters.test.vm }}/32"] }
-  - { name: fleetdesk_demo, from: ["{{ clusters.demo.vm }}/32"] }
+  - { name: keycloak_platform, from: ["{{ clusters.shared.cidr }}"] }
+  - { name: keycloak_test, from: ["{{ clusters.test.cidr }}"] }
+  - { name: keycloak_demo, from: ["{{ clusters.demo.cidr }}"] }
+  - { name: grafana, from: ["{{ clusters.shared.cidr }}"] }
+  - { name: fleetdesk_test, from: ["{{ clusters.test.cidr }}"] }
+  - { name: fleetdesk_demo, from: ["{{ clusters.demo.cidr }}"] }
 
 # Roles that own no database and only connect to another consumer's: AAP 2.7's
 # metrics service reads the controller's tables, and EDA's event streams use

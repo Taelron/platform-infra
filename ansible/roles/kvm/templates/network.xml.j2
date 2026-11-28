@@ -1,0 +1,17 @@
+<!-- {{ ansible_managed }} -->
+<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
+  <name>{{ item.name }}</name>
+  <forward mode='open'/>
+  <bridge name='{{ item.name }}' stp='off' delay='0'/>
+  <dns enable='no'/>
+  <ip address='{{ item.prefix }}.1' prefix='24'>
+    <dhcp>
+      <range start='{{ item.prefix }}.{{ item.dhcp[0] }}' end='{{ item.prefix }}.{{ item.dhcp[1] }}'/>
+    </dhcp>
+  </ip>
+  <dnsmasq:options>
+    <!-- DNS disabled in dnsmasq: hand out BIND on .1, and the platform's domain. -->
+    <dnsmasq:option value='dhcp-option=option:dns-server,{{ item.prefix }}.1'/>
+    <dnsmasq:option value='dhcp-option=option:ntp-server,{{ item.prefix }}.1'/>
+  </dnsmasq:options>
+</network>
