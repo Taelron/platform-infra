@@ -53,15 +53,16 @@ spec:
         imageUrl: {{ caprke2_controlplane_image }}
 ---
 # The provider's variables: LIBVIRT_URI holds no secret (the key is in
-# Secret caplv-ssh).
+# Secret caplv-ssh). "data", not "stringData": kubectl apply reports a
+# stringData Secret as configured on every run.
 apiVersion: v1
 kind: Secret
 metadata:
   name: caplv-variables
   namespace: caplv-system
 type: Opaque
-stringData:
-  LIBVIRT_URI: "{{ caplv_libvirt_uri }}"
+data:
+  LIBVIRT_URI: "{{ caplv_libvirt_uri | b64encode }}"
 ---
 apiVersion: turtles-capi.cattle.io/v1alpha1
 kind: CAPIProvider
