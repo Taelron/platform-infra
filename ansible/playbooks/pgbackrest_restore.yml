@@ -1,0 +1,116 @@
+---
+# Restores the host's PostgreSQL from pgBackRest in S3, to the end of the WAL
+# archive (TAE-139, decision 2: run once on Gaetan's go, kept for disaster
+# recovery).
+#
+# Run it after role `disks` and before role `postgresql`: on an empty folder,
+# that role runs `postgresql-setup --initdb` and starts an empty cluster whose
+# WAL would clash with the stanza in S3.
+#
+#   .venv/bin/ansible-playbook playbooks/pgbackrest_restore.yml
+#
+# It refuses to run while PostgreSQL is running, when the PostgreSQL volume is
+# not mounted, or when the data folder already holds a cluster. It ends with
+# PostgreSQL started, out of recovery, on a new timeline.
+- name: PostgreSQL, restore from pgBackRest
+  hosts: host
+  become: true
+  vars:
+    pgbackrest_restore_home: /var/lib/pgsql
+    pgbackrest_restore_data: /var/lib/pgsql/data
+  tasks:
+    - name: Read the state of PostgreSQL
+      ansible.builtin.systemd_service:
+        name: postgresql
+      register: pgbackrest_restore_unit
+      check_mode: false
+
+    - name: Refuse while PostgreSQL is running
+      ansible.builtin.assert:
+        that: pgbackrest_restore_unit.status.ActiveState != 'active'
+        fail_msg: PostgreSQL is running; stop it before a restore.
+        quiet: true
+
+    - name: Refuse unless the PostgreSQL volume is mounted
+      ansible.builtin.assert:
+        that: pgbackrest_restore_home in (ansible_facts.mounts | map(attribute='mount'))
+        fail_msg: "{{ pgbackrest_restore_home }} is not a mount point; run role disks first."
+        quiet: true
+
+    - name: Look for an existing cluster
+      ansible.builtin.stat:
+        path: "{{ pgbackrest_restore_data }}/PG_VERSION"
+      register: pgbackrest_restore_existing
+
+    - name: Refuse to overwrite a cluster
+      ansible.builtin.assert:
+        that: not pgbackrest_restore_existing.stat.exists
+        fail_msg: "{{ pgbackrest_restore_data }} already holds a cluster."
+        quiet: true
+
+    - name: Give the PostgreSQL folders to postgres
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0700"
+      loop:
+        - "{{ pgbackrest_restore_home }}"
+        - "{{ pgbackrest_restore_data }}"
+
+    - name: Show the backups in the stanza
+      ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} info
+      become: true
+      become_user: postgres
+      register: pgbackrest_restore_info
+      changed_when: false
+      check_mode: false
+
+    - name: Print the backups
+      ansible.builtin.debug:
+        var: pgbackrest_restore_info.stdout_lines
+
+    - name: Restore the latest backup and its WAL
+      ansible.builtin.command: pgbackrest --stanza={{ pgbackrest_stanza }} restore
+      args:
+        creates: "{{ pgbackrest_restore_data }}/PG_VERSION"
+      become: true
+      become_user: postgres
+
+    - name: Label the restored files for SELinux
+      ansible.builtin.command: restorecon -R {{ pgbackrest_restore_home }}
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Start PostgreSQL
+      ansible.builtin.systemd_service:
+        name: postgresql
+        state: started
+      when: not ansible_check_mode
+
+    - name: Wait for the end of recovery
+      ansible.builtin.command: psql -XtAc 'select pg_is_in_recovery()'
+      become: true
+      become_user: postgres
+      register: pgbackrest_restore_recovery
+      until: pgbackrest_restore_recovery.stdout == 'f'
+      retries: 60
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Show the timeline and the databases
+      ansible.builtin.command: >-
+        psql -XtAc "select 'timeline ' || timeline_id from pg_control_checkpoint()
+        union all select datname from pg_database where not datistemplate order by 1"
+      become: true
+      become_user: postgres
+      register: pgbackrest_restore_result
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Print the result
+      ansible.builtin.debug:
+        var: pgbackrest_restore_result.stdout_lines
+      when: not ansible_check_mode

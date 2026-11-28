@@ -7,8 +7,8 @@ garage_image: docker.io/dxflrs/garage@sha256:677e5b758e4425a325b811c425c026bf35a
 
 garage_s3_port: 3900
 garage_s3_region: garage
-# Capacity given to the layout: 90 GB of the 100 GB volume.
-garage_capacity_bytes: 90000000000
+# Capacity given to the layout: 45 GB of the 50 GB volume.
+garage_capacity_bytes: 45000000000
 
 # One bucket and one key per consumer, read and write on its own bucket only.
 # Secrets in SSM (secrets.yml): garage/{rpc-secret,admin-token,
