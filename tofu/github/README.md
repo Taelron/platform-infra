@@ -4,6 +4,8 @@ The GitHub settings the platform relies on, in the organisation `Taelron`:
 
 - the repositories `platform-infra` and `platform-gitops`: public, secret
   scanning and push protection on, `prevent_destroy`;
+- `cluster-api-provider-libvirt`, Taelron's fork of the Cluster API libvirt
+  provider (TAE-139): same settings;
 - two organisation rulesets on the default branch of every Taelron
   repository, bypass list empty (Versioning and Releases, pattern 10):
   - `default-branch`: no force push, no deletion, on every repository;
