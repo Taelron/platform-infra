@@ -205,6 +205,15 @@ nft_flows:
     daddr: ["{{ aws_resolver }}"]
     proto: [udp, tcp]
     dport: [53]
+  - id: 23
+    why: k3s pods (Cluster API, CAPRKE2) to each cluster's API address
+    chain: forward
+    iif: [cni0]
+    oif: [br-shared, br-test, br-demo]
+    saddr: ["{{ k3s_pod_cidr }}"]
+    daddr: ["{{ clusters.shared.api }}", "{{ clusters.test.api }}", "{{ clusters.demo.api }}"]
+    proto: tcp
+    dport: [6443]
   - id: 22
     why: k3s pods (CAPLV) to the host's sshd, as user caplv only (authorized_keys)
     chain: input
