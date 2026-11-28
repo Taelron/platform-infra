@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0](https://github.com/Taelron/platform-infra/compare/foundation-v1.0.0...foundation-v2.0.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **foundation:** r8i.4xlarge host, smaller k3s, PostgreSQL and Garage volumes, shared volume (Part of TAE-139) ([#71](https://github.com/Taelron/platform-infra/issues/71))
+
+### Features
+
+* **foundation:** cost anomaly alerts, budget at $250 before tax (Part of TAE-157) ([#72](https://github.com/Taelron/platform-infra/issues/72)) ([2d193f4](https://github.com/Taelron/platform-infra/commit/2d193f411c4aa7b7810c3b29ccb301c32b2830c4))
+* **foundation:** host reads only /taelron/core in SSM (Part of TAE-138) ([#61](https://github.com/Taelron/platform-infra/issues/61)) ([20c7aa3](https://github.com/Taelron/platform-infra/commit/20c7aa3ae23576c590004573388cf2c1eb7fdcaa))
+* **foundation:** r8i.4xlarge host, smaller k3s, PostgreSQL and Garage volumes, shared volume (Part of TAE-139) ([#71](https://github.com/Taelron/platform-infra/issues/71)) ([e80660e](https://github.com/Taelron/platform-infra/commit/e80660e359350bb69657a350d6820d1e6c9af546))
+
+
+### Bug Fixes
+
+* **foundation:** delete the M3 k3s, PostgreSQL and Garage volumes, prevent_destroy dropped on purpose (Part of TAE-139) ([#76](https://github.com/Taelron/platform-infra/issues/76)) ([04f26d2](https://github.com/Taelron/platform-infra/commit/04f26d2ff201c24ceba9053371b6bec1e5fb4873))
+* **foundation:** SSH from the RHEL box's new outbound address (Part of TAE-139) ([#75](https://github.com/Taelron/platform-infra/issues/75)) ([2de58dd](https://github.com/Taelron/platform-infra/commit/2de58dd3f840dcbe3ef98ebaf408e70c79c1eb60))
+
 ## 1.0.0 (2026-11-14)
 
 
