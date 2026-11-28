@@ -32,6 +32,10 @@ The provider has no resource for these; set by hand, check after any change:
   to create and approve pull requests" on (set by Gaetan, 14 November 2026).
   Without it, the repository setting in `actions.tf` is refused (HTTP 409) and
   release-please cannot open its release pull requests.
+- Organisation Taelron, Packages, Package creation: Public allowed (set by
+  Gaetan, 28 November 2026), so the CAPLV image
+  `ghcr.io/taelron/cluster-api-provider-libvirt` is public: the mgmt cluster
+  pulls it without credentials. The package's own visibility is Public.
 - OIDC subject claims: immutable (`repo:Taelron@279244988/platform-infra@1456341560`).
   The roles in `tofu/bootstrap` trust that subject.
 
