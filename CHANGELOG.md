@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0](https://github.com/Taelron/platform-infra/compare/toolchain-v1.0.0...toolchain-v1.1.0) (2026-11-28)
+
+
+### Features
+
+* **core:** aap project and job templates (Part of TAE-138) ([#65](https://github.com/Taelron/platform-infra/issues/65)) ([b61df7d](https://github.com/Taelron/platform-infra/commit/b61df7daa4be00c313236962661e2a32f5b71746))
+* **core:** ansible skeleton and base role (Part of TAE-138) ([#34](https://github.com/Taelron/platform-infra/issues/34)) ([9d800e0](https://github.com/Taelron/platform-infra/commit/9d800e03c688ff3226afacfe8f91ed4921d58df7))
+* **core:** copy core secrets from pass to ssm (Part of TAE-138) ([#63](https://github.com/Taelron/platform-infra/issues/63)) ([02cecdb](https://github.com/Taelron/platform-infra/commit/02cecdbae8f1a9aab86c477720eb021b53f72bfe))
+* **foundation:** cost anomaly alerts, budget at $250 before tax (Part of TAE-157) ([#72](https://github.com/Taelron/platform-infra/issues/72)) ([2d193f4](https://github.com/Taelron/platform-infra/commit/2d193f411c4aa7b7810c3b29ccb301c32b2830c4))
+* **toolchain:** fork the Cluster API libvirt provider into Taelron (Part of TAE-139) ([#77](https://github.com/Taelron/platform-infra/issues/77)) ([471879f](https://github.com/Taelron/platform-infra/commit/471879fe3966f419bfda336d263b37456645cddd))
+* **toolchain:** organization rulesets protect every default branch (Part of TAE-165) ([#68](https://github.com/Taelron/platform-infra/issues/68)) ([bf830c7](https://github.com/Taelron/platform-infra/commit/bf830c72b324a8ac322a576d0a5f2f077f27bc4c))
+
+
+### Bug Fixes
+
+* **core:** CAPLV v0.2.1-taelron.2, image with tag and digest (Part of TAE-139) ([#84](https://github.com/Taelron/platform-infra/issues/84)) ([fa02627](https://github.com/Taelron/platform-infra/commit/fa02627d9fb1bc731e6d4ef3ab0c61e7a50ea216))
+* **toolchain:** stop pinning core to 1.0.0 in release-please (Part of TAE-139) ([#82](https://github.com/Taelron/platform-infra/issues/82)) ([b2ece59](https://github.com/Taelron/platform-infra/commit/b2ece596ceba5ab665568263b33b1161d943e404))
+
 ## 1.0.0 (2026-11-14)
 
 
