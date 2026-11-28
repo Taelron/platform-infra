@@ -46,6 +46,20 @@
 # path ..., but the request was denied" with "no"). The firewall then drops
 # every new IP connection opened as caplv (role network, nft_deny_users), so
 # the libvirt socket stays the only thing it can reach.
+# Fail closed: sshd lets caplv forward TCP only once the firewall drops every
+# IP connection caplv would open (role network runs first).
+- name: Read the firewall's output chain
+  ansible.builtin.command: nft list chain inet taelron output
+  register: kvm_nft_output
+  changed_when: false
+  check_mode: false
+
+- name: Refuse to open sshd for caplv before the firewall holds it
+  ansible.builtin.assert:
+    that: kvm_nft_output.stdout is search('skuid "?' ~ kvm_caplv_user ~ '"? ct state new drop')
+    fail_msg: The nftables rule for {{ kvm_caplv_user }} is not loaded; run role network first.
+    quiet: true
+
 - name: Let CAPLV forward local Unix sockets only, and nothing else
   ansible.builtin.blockinfile:
     path: /etc/ssh/sshd_config
