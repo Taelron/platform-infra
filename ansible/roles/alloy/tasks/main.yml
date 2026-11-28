@@ -41,6 +41,27 @@
   notify: Restart alloy
   ignore_errors: "{{ ansible_check_mode }}"
 
+- name: Copy the internal root CA for Alloy
+  ansible.builtin.copy:
+    src: taelron-platform-root-ca.pem
+    dest: "{{ alloy_ca_file }}"
+    owner: root
+    group: alloy
+    mode: "0644"
+  when: alloy_remote_enabled
+  notify: Restart alloy
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Resolve the internal endpoints Alloy pushes to
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} Alloy endpoints in shared (role alloy)"
+    block: |
+      {% for h in alloy_hosts %}
+      {{ h.address }} {{ h.name }}
+      {% endfor %}
+    state: "{{ 'present' if alloy_remote_enabled else 'absent' }}"
+
 - name: Write the Alloy configuration
   ansible.builtin.template:
     src: config.alloy.j2
