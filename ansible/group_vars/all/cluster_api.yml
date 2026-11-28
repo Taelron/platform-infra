@@ -28,7 +28,7 @@ cluster_api_clusters: [shared, test, demo]
 # Platform Design Decisions 6). A new commit is a pull request changing it.
 cluster_apply_repository: https://raw.githubusercontent.com/Taelron/platform-gitops
 cluster_apply_definitions:
-  shared: 08920e777f931c72b9558e015eb0fd040f47d113
+  shared: 94451ad6510df694b33dd5c53630c20f5acc5063
 
 # Argo CD in shared (Runbook row 26): installed once by
 # playbooks/argocd_bootstrap.yml with helm, from platform-gitops at a pinned
