@@ -1,14 +1,18 @@
 ---
 # CAPLV (in the mgmt cluster) creates and deletes the cluster VMs through
-# libvirt over SSH, as this user. Group libvirt gives it libvirt's system
-# instance (polkit) and nothing else on the host.
+# libvirt over SSH, as this user. Its libvirt client (go-libvirt) runs no
+# command: it opens a forwarded Unix socket to /var/run/libvirt/libvirt-sock
+# (virtproxyd). So the user has no login shell, and sshd lets it forward local
+# Unix sockets only. Group libvirt gives it libvirt's system instance (polkit),
+# which manages VMs: this is the trust CAPLV needs, accepted with it (Platform
+# Design Decisions 6).
 - name: Create the CAPLV user
   ansible.builtin.user:
     name: "{{ kvm_caplv_user }}"
     comment: Cluster API libvirt provider
     groups: [libvirt]
     append: true
-    shell: /bin/bash
+    shell: /sbin/nologin
     create_home: true
     password: "!"
 
@@ -35,12 +39,33 @@
   check_mode: false
   failed_when: false
 
-# restrict: no forwarding of any kind, no pty; from: the mgmt pods only.
+# Not "restrict": it would also forbid the Unix socket forwarding CAPLV uses.
+# sshd's block below allows that forwarding only.
 - name: Let CAPLV sign in with its key, from the mgmt pods only
   ansible.posix.authorized_key:
     user: "{{ kvm_caplv_user }}"
     key: "{{ kvm_caplv_pub.content | b64decode }}"
-    key_options: restrict,from="{{ k3s_pod_cidr }}"
+    key_options: from="{{ k3s_pod_cidr }}",no-pty,no-agent-forwarding,no-X11-forwarding,no-user-rc
     exclusive: true
     state: present
   when: kvm_caplv_pub.content is defined
+
+# At the end of sshd_config: a Match block ends only at the next Match or at
+# the end of the file, so it cannot sit in a drop-in read first.
+- name: Let CAPLV forward local Unix sockets only, and nothing else
+  ansible.builtin.blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# {mark} Taelron: CAPLV (role kvm)"
+    insertafter: EOF
+    block: |
+      Match User {{ kvm_caplv_user }}
+          AllowStreamLocalForwarding local
+          AllowTcpForwarding no
+          AllowAgentForwarding no
+          X11Forwarding no
+          PermitTTY no
+          PermitTunnel no
+          GatewayPorts no
+          ForceCommand /sbin/nologin
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload sshd

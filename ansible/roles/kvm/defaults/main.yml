@@ -1,7 +1,10 @@
 ---
+# virtproxyd serves /var/run/libvirt/libvirt-sock, the one socket that reaches
+# every driver below: CAPLV connects to it (role kvm, caplv.yml).
 kvm_libvirt_sockets:
   - virtqemud.socket
   - virtnetworkd.socket
   - virtstoraged.socket
   - virtnodedevd.socket
   - virtsecretd.socket
+  - virtproxyd.socket
