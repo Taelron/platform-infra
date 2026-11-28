@@ -42,3 +42,6 @@
     executable: /bin/bash
   when: kvm_default_network.rc == 0
   changed_when: true
+
+- name: Create the cluster networks
+  ansible.builtin.import_tasks: networks.yml

@@ -10,17 +10,27 @@ aws_resolver: 10.20.0.2
 k3s_pod_cidr: 10.42.0.0/16
 
 # The four bridges; the host is .1 on each. br-mgmt also carries the host
-# addresses of the services that run on the host itself.
+# addresses of the services that run on the host itself; NetworkManager owns it.
+# The three cluster bridges are libvirt networks (role kvm): CAPLV reads each
+# VM's address from libvirt's DHCP leases (TAE-139, decided 28 November 2026),
+# so libvirt runs DHCP on them, nodes from .50 to .99. libvirt adds no
+# firewall rule (forward mode open) and no DNS: BIND on .1 stays the resolver.
 bridges:
   - name: br-mgmt
     prefix: 192.168.10
     extra_hosts: [11, 12, 13, 14]
   - name: br-shared
     prefix: 192.168.20
+    libvirt: true
+    dhcp: [50, 99]
   - name: br-test
     prefix: 192.168.30
+    libvirt: true
+    dhcp: [50, 99]
   - name: br-demo
     prefix: 192.168.40
+    libvirt: true
+    dhcp: [50, 99]
 
 # Host addresses on br-mgmt (decision 9).
 postgresql_address: 192.168.10.11
@@ -28,21 +38,25 @@ aap_address: 192.168.10.12
 rancher_address: 192.168.10.13
 garage_address: 192.168.10.14
 
-# Per cluster: its VM and its gateway range (Zones).
+# Per cluster: its bridge's range, its API address (kube-vip on the control
+# plane node; the nodes take DHCP addresses) and its gateways (Zones).
 clusters:
   shared:
     bridge: br-shared
-    vm: 192.168.20.10
+    cidr: 192.168.20.0/24
+    api: 192.168.20.10
     public_gateway: 192.168.20.200
     internal_gateway: 192.168.20.201
   test:
     bridge: br-test
-    vm: 192.168.30.10
+    cidr: 192.168.30.0/24
+    api: 192.168.30.10
     public_gateway: 192.168.30.200
     internal_gateway: 192.168.30.201
   demo:
     bridge: br-demo
-    vm: 192.168.40.10
+    cidr: 192.168.40.0/24
+    api: 192.168.40.10
     public_gateway: 192.168.40.200
     internal_gateway: 192.168.40.201
 
@@ -73,7 +87,7 @@ nft_flows:
     chain: forward
     iif: [br-shared]
     oif: [br-test, br-demo]
-    daddr: ["{{ clusters.test.vm }}", "{{ clusters.demo.vm }}"]
+    daddr: ["{{ clusters.test.api }}", "{{ clusters.demo.api }}"]
     proto: tcp
     dport: [6443]
   - id: 5
@@ -116,6 +130,18 @@ nft_flows:
     daddr: ["{{ host_vpc_address }}"]
     proto: tcp
     dport: [22]
+  - id: 19
+    why: Cluster VMs to libvirt's DHCP on their own bridge
+    chain: input
+    iif: [br-shared, br-test, br-demo]
+    proto: udp
+    dport: [67]
+  - id: 20
+    why: Cluster VMs to the host's chrony on their own bridge
+    chain: input
+    per_bridge_gateway: [br-shared, br-test, br-demo]
+    proto: [udp]
+    dport: [123]
   - id: 18
     why: AAP's job containers on the host to the host's sshd (local, on lo)
     chain: input
@@ -124,6 +150,16 @@ nft_flows:
     daddr: ["{{ host_vpc_address }}"]
     proto: tcp
     dport: [22]
+
+  # Cluster VMs to the internet through the host's NAT (nft_masquerade):
+  # images, packages (decided 28 November 2026).
+  - id: 21
+    why: Cluster VMs to the internet through NAT
+    chain: forward
+    iif: [br-shared, br-test, br-demo]
+    oif: [eth0]
+    proto: tcp
+    dport: [443]
 
   # The mgmt cluster's own pods (k3s on the host), on cni0 only.
   - id: 15
@@ -157,3 +193,18 @@ nft_flows:
     daddr: ["{{ aws_resolver }}"]
     proto: [udp, tcp]
     dport: [53]
+  - id: 22
+    why: k3s pods (CAPLV) to the host's sshd, as user caplv only (authorized_keys)
+    chain: input
+    iif: [cni0]
+    saddr: ["{{ k3s_pod_cidr }}"]
+    daddr: ["{{ host_vpc_address }}"]
+    proto: tcp
+    dport: [22]
+
+# Source NAT to the VPC address for the flows that leave by eth0 from a
+# cluster bridge (flow 21). The k3s pods' NAT is k3s's own.
+nft_masquerade:
+  - "{{ clusters.shared.cidr }}"
+  - "{{ clusters.test.cidr }}"
+  - "{{ clusters.demo.cidr }}"

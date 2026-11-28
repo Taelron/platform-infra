@@ -68,4 +68,12 @@ table inet taelron {
     # Flows 2, 3, 8, 12, 13, 14: traffic from the host itself.
     type filter hook output priority filter; policy accept;
   }
+
+  chain postrouting {
+    # Source NAT for the cluster VMs' flows to the internet (flow 21).
+    type nat hook postrouting priority srcnat; policy accept;
+{% for net in nft_masquerade %}
+    oifname "{{ host_vpc_interface }}" ip saddr {{ net }} masquerade
+{% endfor %}
+  }
 }

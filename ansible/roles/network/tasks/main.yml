@@ -12,13 +12,15 @@
     method6: disabled
     autoconnect: true
     state: present
-  loop: "{{ bridges }}"
+  loop: "{{ bridges | rejectattr('libvirt', 'defined') }}"
   loop_control:
     label: "{{ item.name }}"
 
+# The cluster bridges (libvirt: true) are libvirt networks, made by role kvm.
+
 - name: Bring the bridges up
   ansible.builtin.command: nmcli connection up {{ item.name }}
-  loop: "{{ bridges }}"
+  loop: "{{ bridges | rejectattr('libvirt', 'defined') }}"
   loop_control:
     label: "{{ item.name }}"
   when: item.name not in ansible_facts.interfaces

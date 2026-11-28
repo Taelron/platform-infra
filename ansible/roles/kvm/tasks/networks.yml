@@ -1,0 +1,104 @@
+---
+# The cluster bridges (bridges with libvirt: true in group_vars) are libvirt
+# networks: CAPLV reads each VM's address from libvirt's DHCP leases
+# (TAE-139). libvirt creates the bridge with the host at .1, runs DHCP for the
+# nodes, adds no firewall rule (forward mode open: nftables stays the only
+# firewall) and no DNS (BIND on .1 is the resolver, handed out by DHCP).
+- name: Let libvirt's network daemon start at boot, so its networks autostart
+  ansible.builtin.systemd_service:
+    name: virtnetworkd.service
+    enabled: true
+  ignore_errors: "{{ ansible_check_mode }}"
+
+- name: Remove the NetworkManager bridge libvirt takes over
+  community.general.nmcli:
+    conn_name: "{{ item.name }}"
+    state: absent
+  loop: "{{ bridges | selectattr('libvirt', 'defined') }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: kvm_nm_bridges
+
+- name: Write each cluster network's definition
+  ansible.builtin.template:
+    src: network.xml.j2
+    dest: /etc/libvirt/taelron-{{ item.name }}.xml
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ bridges | selectattr('libvirt', 'defined') }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: kvm_network_xml
+
+# A changed definition is applied by recreating the network: libvirt cannot
+# change a running network's IP or DHCP in place. No VM runs on it before M5.
+- name: Recreate the networks whose definition changed
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    virsh -c qemu:///system net-destroy {{ item.item.name }} 2>/dev/null || true;
+    virsh -c qemu:///system net-undefine {{ item.item.name }} 2>/dev/null || true;
+    virsh -c qemu:///system net-define {{ item.dest }}
+  args:
+    executable: /bin/bash
+  loop: "{{ kvm_network_xml.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: item is changed and not ansible_check_mode
+  changed_when: true
+
+- name: Read the state of each cluster network
+  ansible.builtin.command: virsh -c qemu:///system net-info {{ item.name }}
+  loop: "{{ bridges | selectattr('libvirt', 'defined') }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: kvm_network_info
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Start each cluster network and start it at boot
+  ansible.builtin.shell: >-
+    set -o pipefail;
+    virsh -c qemu:///system net-info {{ item.item.name }} | grep -q '^Active: *yes'
+    || virsh -c qemu:///system net-start {{ item.item.name }};
+    virsh -c qemu:///system net-autostart {{ item.item.name }}
+  args:
+    executable: /bin/bash
+  loop: "{{ kvm_network_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: >-
+    not ansible_check_mode and (item.rc != 0
+    or not (item.stdout is search('Active:\s+yes'))
+    or not (item.stdout is search('Autostart:\s+yes')))
+  changed_when: true
+  register: kvm_network_started
+
+# BIND listens on each bridge's .1; it picks up the address libvirt now holds.
+- name: Restart BIND after a bridge changed hands
+  ansible.builtin.systemd_service:
+    name: named
+    state: restarted
+  when: kvm_nm_bridges is changed or kvm_network_started is changed
+
+- name: Create BIND's unit drop-in folder
+  ansible.builtin.file:
+    path: /etc/systemd/system/named.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Start BIND after libvirt's networks at boot
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/named.service.d/20-libvirt-networks.conf
+    content: |
+      # The cluster bridges, on which BIND listens, are libvirt networks.
+      [Unit]
+      Wants=virtnetworkd.service
+      After=virtnetworkd.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
