@@ -77,27 +77,28 @@ spec:
     name: caplv-variables
   fetchConfig:
     url: {{ caplv_components_url }}
-  manifestPatches:
-    # The SSH key and known_hosts, readable by the non-root manager.
-    - |
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
+  # RFC 6902 JSON patch: it appends to the Deployment's lists.
+  # (manifestPatches is an RFC 7396 merge patch, which replaces a list whole:
+  # the manager container lost its image and Turtles refused the manifest.)
+  patches:
+    - target:
+        kind: Deployment
         name: caplv-controller-manager
-        namespace: caplv-system
-      spec:
-        template:
-          spec:
-            securityContext:
-              fsGroup: 65532
-            containers:
-              - name: manager
-                volumeMounts:
-                  - name: caplv-ssh
-                    mountPath: /caplv-ssh
-                    readOnly: true
-            volumes:
-              - name: caplv-ssh
-                secret:
-                  secretName: caplv-ssh
-                  defaultMode: 0440
+      # The SSH key and known_hosts, readable by the non-root manager.
+      patch: |
+        - op: add
+          path: /spec/template/spec/securityContext/fsGroup
+          value: 65532
+        - op: add
+          path: /spec/template/spec/volumes/-
+          value:
+            name: caplv-ssh
+            secret:
+              secretName: caplv-ssh
+              defaultMode: 0440
+        - op: add
+          path: /spec/template/spec/containers/0/volumeMounts/-
+          value:
+            name: caplv-ssh
+            mountPath: /caplv-ssh
+            readOnly: true
