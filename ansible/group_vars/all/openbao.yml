@@ -40,11 +40,13 @@ openbao_config:
       crl_distribution_points: ["{{ openbao_pki_url }}/v1/pki_int/crl"]
 
   # One PKI role per cluster: each cluster's cert-manager signs only its own
-  # names, so a test certificate can never pass for a shared service.
-  # ttl 30 days, max_ttl 90 days.
+  # names, so a test certificate can never pass for a shared service. No
+  # svc.cluster.local: through the ClusterIssuer any namespace could then
+  # get a certificate for another's Service (OpenBao's, say); Istio's mTLS
+  # covers traffic inside the cluster. ttl 30 days, max_ttl 90 days.
   - path: pki_int/roles/shared
     data:
-      allowed_domains: [shared.int.taelron.com, svc.cluster.local]
+      allowed_domains: [shared.int.taelron.com]
       allow_subdomains: true
       allow_bare_domains: false
       allow_localhost: false
