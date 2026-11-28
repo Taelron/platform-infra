@@ -1,7 +1,8 @@
 ---
 # One KV version 2 secret at secret/<openbao_kv_path>, written only when its
-# data differs (playbooks/openbao_init.yml). The root token and the data
-# reach bao on stdin.
+# data differs (playbooks/openbao_init.yml), or, with openbao_kv_only_if_missing,
+# only when it does not exist yet (a generated value, never rotated by a run).
+# The root token and the data reach bao on stdin.
 - name: Read secret/{{ openbao_kv_path }}
   ansible.builtin.command:
     argv: "{{ openbao_bao_auth + ['kv', 'get', '-format=json', '-mount=secret', openbao_kv_path] }}"
@@ -20,5 +21,6 @@
   changed_when: true
   when: >-
     openbao_kv_now.rc != 0
-    or (openbao_kv_now.stdout | from_json).data.data != openbao_kv_data
+    or (not (openbao_kv_only_if_missing | default(false))
+        and (openbao_kv_now.stdout | from_json).data.data != openbao_kv_data)
   no_log: true

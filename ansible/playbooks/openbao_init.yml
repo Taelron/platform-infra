@@ -15,9 +15,10 @@
 # 3. The internal CA: a root in pki/ and an intermediate in pki_int/ signed by
 #    it, each generated only while its mount has no issuer.
 # 4. openbao_config: each path read, and written when a field differs.
-# 5. Bootstrap secrets into KV: the Garage keys, ExternalDNS's BIND key, and
-#    Argo CD's break-glass password, after which argocd-initial-admin-secret
-#    is deleted.
+# 5. Bootstrap secrets into KV: the Garage keys, ExternalDNS's BIND key,
+#    Grafana's database password and a generated admin password (written
+#    once), and Argo CD's break-glass password, after which
+#    argocd-initial-admin-secret is deleted.
 #
 # The root token reaches bao on stdin, never in argv, a file or the log.
 - name: OpenBao, initialised and configured
@@ -316,6 +317,27 @@
                   tsig_keyname: "{{ openbao_cluster }}-update"
                   tsig_algorithm: hmac-sha256
                   tsig_secret: "{{ lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/bind/' ~ openbao_cluster, region=core_secrets_region) }}"
+
+            - name: Grafana's database password
+              ansible.builtin.include_tasks: tasks/openbao_kv.yml
+              vars:
+                openbao_kv_path: grafana/database
+                openbao_kv_data:
+                  # PostgreSQL grafana on the host (decision 7), role postgresql.
+                  user: grafana
+                  password: "{{ lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/postgresql/grafana', region=core_secrets_region) }}"
+
+            # Grafana's local admin, until Keycloak (decision 5). Grafana reads
+            # it through External Secrets, so it is not under break-glass/.
+            # Generated once; a later run never rotates it.
+            - name: Grafana's admin password, generated once
+              ansible.builtin.include_tasks: tasks/openbao_kv.yml
+              vars:
+                openbao_kv_path: grafana/admin
+                openbao_kv_only_if_missing: true
+                openbao_kv_data:
+                  admin-user: admin
+                  admin-password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
 
             - name: Read Argo CD's initial admin password, while its Secret exists
               ansible.builtin.command:
