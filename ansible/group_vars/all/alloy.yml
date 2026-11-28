@@ -3,9 +3,25 @@ alloy_version: 1.21.3
 # Grafana's RPM signing key, in the role, checked against this fingerprint.
 grafana_rpm_key_fingerprint: B53AE77BADB630A683046005963FA27710458545
 
-# Mimir and Loki run in shared from Phase 5, behind the internal gateway
-# {{ clusters.shared.internal_gateway }}. Until then Alloy collects but sends
-# nothing.
-alloy_remote_enabled: false
-alloy_mimir_url: ""
-alloy_loki_url: ""
+# Mimir and Loki in shared, behind the internal gateway
+# {{ clusters.shared.internal_gateway }}:443 (decisions 11 and 20, flow 3),
+# with a certificate from OpenBao, the internal CA (decision 22). Their
+# routes take pushes only.
+alloy_remote_enabled: true
+alloy_mimir_url: https://mimir.shared.int.taelron.com/api/v1/push
+alloy_loki_url: https://loki.shared.int.taelron.com/loki/api/v1/push
+
+# The internal root CA (Taelron Platform Root CA, to 2036, SHA-256
+# 57:07:F6:EA:...:98:09), a public certificate, in the role. Alloy trusts it
+# for these two endpoints only; the host's own trust store is unchanged.
+alloy_ca_file: /etc/alloy/taelron-platform-root-ca.pem
+
+# The host resolves through the AWS resolver, which does not know
+# int.taelron.com; pointing it at BIND on 127.0.0.1 would make k3s give its
+# pods a public resolver, which flow 17 drops. So the two names Alloy needs
+# are in /etc/hosts, on the internal gateway's fixed address.
+alloy_hosts:
+  - name: mimir.shared.int.taelron.com
+    address: "{{ clusters.shared.internal_gateway }}"
+  - name: loki.shared.int.taelron.com
+    address: "{{ clusters.shared.internal_gateway }}"
