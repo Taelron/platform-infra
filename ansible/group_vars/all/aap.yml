@@ -84,4 +84,5 @@ aap_config_playbooks:
   - kvm
   - k3s_rancher
   - cluster_apply
+  - argocd_bootstrap
   - health

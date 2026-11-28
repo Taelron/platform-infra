@@ -1,0 +1,85 @@
+---
+# Installs Argo CD in the shared cluster once, then hands it to itself
+# (Runbook row 26). After this, Argo CD reads platform-gitops main:
+# bootstrap/root.yaml -> shared/apps (Argo CD itself, Cilium's settings, ...).
+#
+#   .venv/bin/ansible-playbook playbooks/argocd_bootstrap.yml
+#
+# shared's kubeconfig comes from mgmt (Secret shared/shared-kubeconfig, made
+# by Cluster API) into a root-only temporary file, removed at the end.
+- name: Argo CD in shared
+  hosts: host
+  become: true
+  vars:
+    argocd_gitops_raw: "{{ cluster_apply_repository }}/{{ argocd_bootstrap_commit }}"
+    argocd_workdir: /root/argocd-bootstrap
+  tasks:
+    - name: Create a root-only working folder
+      ansible.builtin.file:
+        path: "{{ argocd_workdir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Download helm, checked against its pinned checksum
+      ansible.builtin.get_url:
+        url: https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz
+        dest: "{{ argocd_workdir }}/helm-{{ helm_version }}.tar.gz"
+        checksum: sha256:{{ helm_sha256 }}
+        mode: "0600"
+      # In check mode the working folder does not exist yet.
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: Unpack helm
+      ansible.builtin.unarchive:
+        src: "{{ argocd_workdir }}/helm-{{ helm_version }}.tar.gz"
+        dest: "{{ argocd_workdir }}"
+        remote_src: true
+        include: [linux-amd64/helm]
+        creates: "{{ argocd_workdir }}/linux-amd64/helm"
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: Fetch the values and the root application at the pinned commit
+      ansible.builtin.get_url:
+        url: "{{ argocd_gitops_raw }}/{{ item }}"
+        dest: "{{ argocd_workdir }}/{{ item | basename }}"
+        mode: "0600"
+      loop:
+        - shared/argocd/values.yaml
+        - bootstrap/root.yaml
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: Write shared's kubeconfig from mgmt
+      ansible.builtin.shell: >-
+        set -o pipefail;
+        /usr/local/bin/k3s kubectl -n shared get secret shared-kubeconfig -o jsonpath='{.data.value}'
+        | base64 -d > {{ argocd_workdir }}/kubeconfig && chmod 0600 {{ argocd_workdir }}/kubeconfig
+      args:
+        executable: /bin/bash
+      changed_when: false
+      no_log: true
+
+    - name: Install or upgrade Argo CD with helm
+      ansible.builtin.command: >-
+        {{ argocd_workdir }}/linux-amd64/helm upgrade --install argocd argo-cd
+        --repo {{ argocd_chart_repository }} --version {{ argocd_chart_version }}
+        --namespace argocd --create-namespace
+        --values {{ argocd_workdir }}/values.yaml
+        --kubeconfig {{ argocd_workdir }}/kubeconfig --wait --timeout 10m
+      register: argocd_helm
+      changed_when: true
+      when: not ansible_check_mode
+
+    - name: Apply the root application
+      ansible.builtin.command: >-
+        /usr/local/bin/k3s kubectl --kubeconfig {{ argocd_workdir }}/kubeconfig
+        apply -f {{ argocd_workdir }}/root.yaml
+      register: argocd_root
+      changed_when: argocd_root.stdout is not search(' unchanged$')
+      when: not ansible_check_mode
+
+    - name: Remove shared's kubeconfig
+      ansible.builtin.file:
+        path: "{{ argocd_workdir }}/kubeconfig"
+        state: absent
