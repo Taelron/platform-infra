@@ -42,3 +42,11 @@ argocd_chart_version: 10.20.0
 # were rendered with.
 helm_version: v3.22.1
 helm_sha256: 896cf63684a42a723d61c980369d6e588330927deb13676ca0d85006dd6da0ea
+
+# Secrets a cluster needs before its OpenBao runs, from SSM, written into the
+# cluster by playbooks/cluster_secrets.yml (shared's kubeconfig from mgmt).
+# Every other cluster secret comes from OpenBao through External Secrets.
+#   seal key:   SSM openbao/unseal-key-<cluster>, 32 random bytes in base64
+#               (OpenBao's static seal reads the raw bytes from the file).
+#   storage:    PostgreSQL openbao_<cluster>, password SSM postgresql/openbao_<cluster>.
+cluster_secrets_clusters: [shared]

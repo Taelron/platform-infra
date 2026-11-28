@@ -22,6 +22,7 @@ is installed, AAP runs the same playbooks as job templates from GitHub.
 | `playbooks/pgbackrest_restore.yml` | PostgreSQL restore from pgBackRest  |
 | `playbooks/cluster_apply.yml` | a cluster definition to mgmt (once)  |
 | `playbooks/argocd_bootstrap.yml` | Argo CD in shared (once)        |
+| `playbooks/cluster_secrets.yml` | OpenBao's bootstrap Secrets      |
 
 `inventory/group_vars` links to `group_vars`, so Ansible reads it next to the
 inventory.
