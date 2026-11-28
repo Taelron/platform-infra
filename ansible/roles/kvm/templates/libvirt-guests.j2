@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# What libvirt does with the cluster VMs when the host stops or starts
+# (role kvm). The host stops every night and when idle; each VM is shut
+# down cleanly first, so a node never loses what it last wrote.
+
+# Starting is left to each domain's autostart flag, which CAPLV sets.
+ON_BOOT=ignore
+
+# ACPI shutdown of every running VM, all at once, then wait for them.
+ON_SHUTDOWN=shutdown
+PARALLEL_SHUTDOWN={{ kvm_guests_parallel_shutdown }}
+SHUTDOWN_TIMEOUT={{ kvm_guests_shutdown_timeout }}
+
+URIS=qemu:///system

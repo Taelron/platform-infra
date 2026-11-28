@@ -23,3 +23,9 @@ kvm_pools:
 # host; role k3s_rancher gives the private key to CAPLV as a Secret.
 kvm_caplv_user: caplv
 kvm_caplv_key: /etc/caplv/id
+
+# libvirt-guests (role kvm): at a host stop every VM gets an ACPI shutdown,
+# up to 3 at once, and up to 120 s to finish (one RKE2 node takes well under
+# a minute; a stop of the EC2 instance waits for the OS).
+kvm_guests_parallel_shutdown: 3
+kvm_guests_shutdown_timeout: 120
