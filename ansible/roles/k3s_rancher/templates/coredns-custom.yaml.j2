@@ -1,0 +1,15 @@
+# {{ ansible_managed }}
+# Rancher's own name resolves, inside mgmt, to Rancher's Service: Rancher
+# Turtles downloads the import manifest of a Cluster API cluster from
+# server-url, and with agent-tls-mode strict it trusts only Rancher's own CA
+# (cacerts), which the public load balancer's ACM certificate is not signed
+# by. The cluster VMs reach the same name at {{ rancher_address }} (BIND),
+# which also serves Rancher's CA. k3s imports this ConfigMap into CoreDNS.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+data:
+  rancher.override: |
+    rewrite name exact {{ rancher_hostname }} rancher.cattle-system.svc.cluster.local
