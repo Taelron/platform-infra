@@ -6,45 +6,34 @@
 # recreated smaller (a gp3 volume never shrinks), and the shared cluster's
 # volume is added. The test and demo volumes come with their clusters.
 #
-# The M3 volumes stay in aws_ebs_volume.data, still guarded by
-# prevent_destroy. k3s, PostgreSQL and Garage are detached from the host and
-# renamed platform-<name>-m3; a later pull request deletes them once
-# PostgreSQL is restored from pgBackRest on the new volume (TAE-139, step 1
-# check, decision 1). AAP keeps its M3 volume.
+# The M3 k3s, PostgreSQL and Garage volumes are deleted (TAE-139, step 1 check,
+# decision 1) now that PostgreSQL is restored from pgBackRest on the new
+# volume: their resources are gone from this file, and with them their
+# prevent_destroy. AAP keeps its M3 volume, moved to resources of its own.
 
 locals {
   # Inventory grouping (TAE-156): every taggable resource of this file.
   storage_tags = { Component = "storage" }
 
-  # Created in M3. attached = false: detached, waiting to be deleted.
-  m3_volumes = {
-    k3s        = { size = 30, device = "/dev/sdf", attached = false }
-    postgresql = { size = 80, device = "/dev/sdg", attached = false }
-    aap        = { size = 30, device = "/dev/sdh", attached = true }
-    garage     = { size = 100, device = "/dev/sdi", attached = false }
-  }
-
-  # Created in M5. New device names: the M3 volumes free theirs in the same
-  # apply, in no guaranteed order.
+  # Created in M5. The shared VM's disk is handed to KVM as a raw disk
+  # (role kvm).
   m5_volumes = {
     k3s        = { size = 20, device = "/dev/sdj" }
     postgresql = { size = 20, device = "/dev/sdk" }
     garage     = { size = 50, device = "/dev/sdl" }
-    # The shared VM's disk: handed to KVM as a raw disk (role kvm).
-    shared = { size = 40, device = "/dev/sdm" }
+    shared     = { size = 40, device = "/dev/sdm" }
   }
 }
 
-resource "aws_ebs_volume" "data" {
-  for_each = local.m3_volumes
-
+# AAP's volume, created in M3, unchanged in M5.
+resource "aws_ebs_volume" "aap" {
   availability_zone = aws_subnet.public["a"].availability_zone
   type              = "gp3"
-  size              = each.value.size
+  size              = 30
   encrypted         = true
 
   tags = merge(local.storage_tags, {
-    Name   = each.value.attached ? "platform-${each.key}" : "platform-${each.key}-m3"
+    Name   = "platform-aap"
     Backup = "daily"
   })
 
@@ -53,12 +42,20 @@ resource "aws_ebs_volume" "data" {
   }
 }
 
-resource "aws_volume_attachment" "data" {
-  for_each = { for k, v in local.m3_volumes : k => v if v.attached }
-
-  device_name = each.value.device
-  volume_id   = aws_ebs_volume.data[each.key].id
+resource "aws_volume_attachment" "aap" {
+  device_name = "/dev/sdh"
+  volume_id   = aws_ebs_volume.aap.id
   instance_id = aws_instance.host.id
+}
+
+moved {
+  from = aws_ebs_volume.data["aap"]
+  to   = aws_ebs_volume.aap
+}
+
+moved {
+  from = aws_volume_attachment.data["aap"]
+  to   = aws_volume_attachment.aap
 }
 
 resource "aws_ebs_volume" "m5" {
