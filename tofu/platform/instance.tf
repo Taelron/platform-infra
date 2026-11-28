@@ -2,11 +2,11 @@
 # the Red Hat gold image (no Red Hat fee per hour), nested virtualization on
 # for KVM, private address 10.20.1.10, Elastic IP 1 for SSH.
 #
-# Size: r8i.2xlarge (8 vCPU, 64 GB) to start, decided by Gaetan on 14 November
-# 2026; enough for the host's own services (Phases 3 and 4). Resized to
-# r8i.4xlarge at the start of Phase 5, before the shared VM: the host and the
-# shared VM need 60 GB, and the r8i.2xlarge shows 61. Changing instance_type
-# stops, resizes and starts the instance in place, same volumes and addresses.
+# Size: r8i.2xlarge (8 vCPU, 64 GB) from 14 November 2026, enough for the
+# host's own services (M3 and M4). r8i.4xlarge (16 vCPU, 128 GB) from the start
+# of M5, before the shared VM: the host and the shared VM need 60 GB, and the
+# r8i.2xlarge shows 61. Changing instance_type stops, resizes and starts the
+# instance in place, same root volume and addresses.
 #
 # First apply (14 November 2026) stopped at the instance: AWS answered
 # PendingVerification while it validated the new account's access to
@@ -110,7 +110,7 @@ resource "aws_iam_instance_profile" "host" {
 
 resource "aws_instance" "host" {
   ami                     = local.rhel_gold_ami
-  instance_type           = "r8i.2xlarge"
+  instance_type           = "r8i.4xlarge"
   subnet_id               = aws_subnet.public["a"].id
   private_ip              = local.host_ip
   vpc_security_group_ids  = [aws_security_group.host.id]
