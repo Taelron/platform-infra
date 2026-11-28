@@ -20,29 +20,38 @@
   changed_when: k3s_rancher_capi_apply.stdout_lines | reject('search', ' unchanged$') | list | length > 0
   when: not ansible_check_mode
 
-- name: Read CAPLV's key and the host's SSH host key
+- name: Read CAPLV's key
   ansible.builtin.slurp:
-    src: "{{ item }}"
-  loop:
-    - "{{ kvm_caplv_key }}"
-    - /etc/ssh/ssh_host_ed25519_key.pub
-  register: k3s_rancher_caplv_files
+    src: "{{ kvm_caplv_key }}"
+  register: k3s_rancher_caplv_key
   no_log: true
+
+# Every host key type: Go's SSH client may negotiate RSA or ECDSA, and an
+# entry of another type only is a "knownhosts: key mismatch".
+- name: Read the host's SSH host keys
+  ansible.builtin.slurp:
+    src: /etc/ssh/ssh_host_{{ item }}_key.pub
+  loop: [ed25519, ecdsa, rsa]
+  register: k3s_rancher_host_keys
 
 - name: Give CAPLV its SSH key and the host's key as Secret caplv-ssh
   ansible.builtin.command:
     cmd: /usr/local/bin/k3s kubectl apply -f -
     stdin: "{{ secret | to_json }}"
   vars:
-    host_key: "{{ (k3s_rancher_caplv_files.results[1].content | b64decode).split()[:2] | join(' ') }}"
+    # One line per key: "<address> <type> <key>".
+    known_hosts: >-
+      {{ (k3s_rancher_host_keys.results | map(attribute='content') | map('b64decode')
+          | map('regex_replace', '^(\\S+) (\\S+).*\\s*$', host_vpc_address ~ ' \\1 \\2')
+          | join('\n')) ~ '\n' }}
     secret:
       apiVersion: v1
       kind: Secret
       metadata: {name: caplv-ssh, namespace: caplv-system}
       type: Opaque
       data:
-        id: "{{ k3s_rancher_caplv_files.results[0].content }}"
-        known_hosts: "{{ (host_vpc_address ~ ' ' ~ host_key ~ '\n') | b64encode }}"
+        id: "{{ k3s_rancher_caplv_key.content }}"
+        known_hosts: "{{ known_hosts | b64encode }}"
   register: k3s_rancher_caplv_secret
   changed_when: k3s_rancher_caplv_secret.stdout is not search(' unchanged$')
   when: not ansible_check_mode
