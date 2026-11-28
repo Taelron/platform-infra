@@ -64,13 +64,16 @@
     stdin: "{{ secret | to_json }}"
   vars:
     password: "{{ lookup('amazon.aws.ssm_parameter', core_secrets_prefix ~ '/postgresql/rke2_' ~ item, region=core_secrets_region) }}"
+    endpoint: >-
+      postgres://rke2_{{ item }}:{{ password | urlencode }}@{{ postgresql_address }}:5432/rke2_{{ item }}?sslmode=require
     secret:
       apiVersion: v1
       kind: Secret
       metadata: {name: "{{ item }}-datastore", namespace: "{{ item }}"}
       type: Opaque
-      stringData:
-        endpoint: "postgres://rke2_{{ item }}:{{ password | urlencode }}@{{ postgresql_address }}:5432/rke2_{{ item }}?sslmode=require"
+      # "data": a stringData Secret is "configured" on every apply.
+      data:
+        endpoint: "{{ endpoint | b64encode }}"
   loop: "{{ cluster_api_clusters }}"
   register: k3s_rancher_datastore_secrets
   changed_when: k3s_rancher_datastore_secrets.stdout is not search(' unchanged$')
