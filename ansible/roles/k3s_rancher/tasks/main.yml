@@ -86,3 +86,6 @@
 - name: Wait for Rancher
   ansible.builtin.import_tasks: wait.yml
   when: not ansible_check_mode
+
+- name: Add the Cluster API providers and their Secrets
+  ansible.builtin.import_tasks: cluster_api.yml
