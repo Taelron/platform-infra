@@ -29,3 +29,16 @@ cluster_api_clusters: [shared, test, demo]
 cluster_apply_repository: https://raw.githubusercontent.com/Taelron/platform-gitops
 cluster_apply_definitions:
   shared: e7894038125c1f7a8d7c7201b0efb552928c3f58
+
+# Argo CD in shared (Runbook row 26): installed once by
+# playbooks/argocd_bootstrap.yml with helm, from platform-gitops at a pinned
+# commit (shared/argocd/values.yaml, bootstrap/root.yaml); then Argo CD
+# manages itself from main.
+argocd_bootstrap_commit: e047d817d459e22fb23e76db11cf30e806a4781e
+argocd_chart_repository: https://argoproj.github.io/argo-helm
+argocd_chart_version: 10.20.0
+
+# helm, on the host for that bootstrap only. v3: the same major the values
+# were rendered with.
+helm_version: v3.22.1
+helm_sha256: 896cf63684a42a723d61c980369d6e588330927deb13676ca0d85006dd6da0ea
